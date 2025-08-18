@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:image_picker/image_picker.dart'; // (현재 코드에선 사용 안 하지만 기존 유지)
+import 'dart:io'; // (현재 코드에선 사용 안 하지만 기존 유지)
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
+import 'app_bottom_nav.dart';
 
 class ChatbotPage extends StatefulWidget {
   const ChatbotPage({super.key});
@@ -16,6 +17,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _messageController = TextEditingController();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final List<Map<String, String>> _messages = [];
+  final ScrollController _scrollController = ScrollController();
+
+  bool _loadingHistory = false; // ✅ 로딩 상태
 
   @override
   void initState() {
@@ -24,8 +28,18 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   Future<void> _loadChatHistory() async {
+    setState(() => _loadingHistory = true); // ✅ 시작 시 로딩 on
+
     final token = await _storage.read(key: 'accessToken');
-    if (token == null) return;
+    if (token == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 필요합니다')),
+        );
+      }
+      if (mounted) setState(() => _loadingHistory = false);
+      return;
+    }
 
     try {
       final response = await http.get(
@@ -36,6 +50,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
       if (response.statusCode == 200) {
         final List<dynamic> history = jsonDecode(response.body);
         final ordered = history.reversed.toList();
+        if (!mounted) return;
         setState(() {
           _messages.add({
             "role": "bot",
@@ -46,9 +61,21 @@ class _ChatbotPageState extends State<ChatbotPage> {
             _messages.add({"role": "bot", "message": item['bot_response']});
           }
         });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('기록 불러오기 실패: ${response.statusCode}')),
+          );
+        }
       }
     } catch (e) {
-      print('채팅 기록 불러오기 오류: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('채팅 기록 불러오기 오류: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingHistory = false); // ✅ 종료 시 로딩 off
     }
   }
 
@@ -63,9 +90,11 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
     final accessToken = await _getAccessToken();
     if (accessToken == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 필요합니다')),
+        );
+      }
       return;
     }
 
@@ -84,6 +113,8 @@ class _ChatbotPageState extends State<ChatbotPage> {
         body: jsonEncode({"message": message}),
       );
 
+      if (!mounted) return;
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final botResponse = data['response'] ?? '답변을 가져오지 못했습니다.';
@@ -99,6 +130,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _messages.add({"role": "bot", "message": "네트워크 오류: $e"});
       });
@@ -107,6 +139,53 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ UserProfilePage처럼: 로딩 중엔 스피너 먼저 보여주기
+    if (_loadingHistory) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Stack(
+            children: [
+              Container(height: 60, color: Colors.white),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: AppBar(
+                  scrolledUnderElevation: 0,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  title: const Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '챗봇',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF353535),
+                      ),
+                    ),
+                  ),
+                  centerTitle: true,
+                  automaticallyImplyLeading: false,
+                ),
+              ),
+            ],
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()), // ✅ 로딩 표시
+        bottomNavigationBar: const AppBottomNav(currentIndex: 1),
+      );
+    }
+
+    // ✅ 로딩 끝나면 정상 화면
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: PreferredSize(
@@ -150,6 +229,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
@@ -157,12 +237,11 @@ class _ChatbotPageState extends State<ChatbotPage> {
                 final isUser = message['role'] == 'user';
                 final messageWidget = Align(
                   alignment:
-                      isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
-                    margin:
-                        isUser
-                            ? const EdgeInsets.fromLTRB(80, 20, 16, 5)
-                            : const EdgeInsets.fromLTRB(16, 8, 60, 5),
+                    margin: isUser
+                        ? const EdgeInsets.fromLTRB(80, 20, 16, 5)
+                        : const EdgeInsets.fromLTRB(16, 8, 60, 5),
                     padding: const EdgeInsets.all(12),
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.75,
@@ -172,10 +251,9 @@ class _ChatbotPageState extends State<ChatbotPage> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color:
-                              isUser
-                                  ? const Color(0xFF5DD194).withOpacity(0.2)
-                                  : Colors.redAccent.withOpacity(0.2),
+                          color: isUser
+                              ? const Color(0xFF5DD194).withOpacity(0.2)
+                              : Colors.redAccent.withOpacity(0.2),
                           blurRadius: 6,
                           offset: const Offset(0, 3),
                         ),
@@ -209,9 +287,8 @@ class _ChatbotPageState extends State<ChatbotPage> {
                           ),
                           child: const CircleAvatar(
                             radius: 16,
-                            backgroundImage: AssetImage(
-                              'lib/asset/chatbot_profile.png',
-                            ),
+                            backgroundImage:
+                            AssetImage('lib/asset/chatbot_profile.png'),
                             backgroundColor: Colors.white,
                           ),
                         ),
@@ -274,85 +351,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 2,
-              offset: const Offset(0, 0),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          type: BottomNavigationBarType.fixed,
-          currentIndex: 1,
-          onTap: (index) {
-            switch (index) {
-              case 0:
-                Navigator.pushNamed(context, '/map');
-                break;
-              case 1:
-                break;
-              case 2:
-                Navigator.pushNamed(context, '/community');
-                break;
-              case 3:
-                Navigator.pushNamed(context, '/disastermenu');
-                break;
-              case 4:
-                Navigator.pushNamed(context, '/user');
-                break;
-            }
-          },
-          selectedItemColor: Colors.redAccent,
-          unselectedItemColor: Colors.grey[300],
-          showSelectedLabels: false,
-          showUnselectedLabels: false,
-          selectedIconTheme: const IconThemeData(size: 30),
-          unselectedIconTheme: const IconThemeData(size: 30),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Icon(Icons.place),
-              ),
-              label: '지도',
-            ),
-            BottomNavigationBarItem(
-              icon: Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Icon(Icons.chat),
-              ),
-              label: '채팅',
-            ),
-            BottomNavigationBarItem(
-              icon: Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Icon(Icons.groups),
-              ),
-              label: '커뮤니티',
-            ),
-            BottomNavigationBarItem(
-              icon: Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Icon(Icons.dashboard),
-              ),
-              label: '재난메뉴',
-            ),
-            BottomNavigationBarItem(
-              icon: Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Icon(Icons.favorite_border),
-              ),
-              label: '마이',
-            ),
-          ],
-        ),
-      ),
+      bottomNavigationBar: const AppBottomNav(currentIndex: 1),
     );
   }
 }
