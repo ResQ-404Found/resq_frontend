@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
-
 import 'disaster_guide_page.dart';
 import 'checklist.dart';
 import 'all_disaster_type_detail_page.dart';
-import 'app_bottom_nav.dart'; // ✅ 공통 바텀바 추가
-
+import 'app_bottom_nav.dart';
+import 'friend_page.dart';
 class DisasterMenuPage extends StatelessWidget {
   const DisasterMenuPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final menuItems = [
+      // {
+      //   'title': '전체 재난 정보',
+      //   'subtitle': '전체 재난 기록 확인',
+      //   'icon': Icons.warning_amber_rounded,
+      //   'color': Colors.redAccent,
+      // },
       {
-        'title': '전체 재난 정보',
-        'subtitle': '전체 재난 기록 확인',
-        'icon': Icons.warning_amber_rounded,
+        'title': '친구',
+        'subtitle': '비상 시 연락망',
+        'icon': Icons.account_box_rounded,
         'color': Colors.redAccent,
       },
       {
@@ -79,20 +84,27 @@ class DisasterMenuPage extends StatelessWidget {
                           builder: (_) => const AllDisasterTypeDetailPage(),
                         ),
                       );
-                    } else if (title == '대피 방법') {
+                    }else if (title == '친구') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const EmergencyContactsPage(),
+                        ),
+                      );
+                    }else if (title == '대피 방법') {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => DisasterGuidePage(initialIndex: 0),
                         ),
                       );
-                    } else if (title == '체크리스트') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ChecklistPage(),
-                        ),
-                      );
+                    // } else if (title == '체크리스트') {
+                    //   Navigator.push(
+                    //     context,
+                    //     MaterialPageRoute(
+                    //       builder: (_) => const ChecklistPage(),
+                    //     ),
+                    //   );
                     } else if (title == '뉴스') {
                       Navigator.pushNamed(context, '/news');
                     } else if (title == '후원') {
