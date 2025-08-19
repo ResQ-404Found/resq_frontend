@@ -165,7 +165,6 @@ class _ChecklistPageState extends State<ChecklistPage> {
                       checkedStates[sectionIndex].where((e) => e).length;
                   final sectionTotal = section.items.length;
                   final sectionPercent =
-
                   sectionTotal == 0 ? 0 : (sectionDone / sectionTotal);
                   final isSectionCompleted = sectionDone == sectionTotal;
                   return Container(
@@ -192,7 +191,6 @@ class _ChecklistPageState extends State<ChecklistPage> {
                                 ), // 왼쪽 8, 오른쪽 12 간격 추가
                                 child: CircleAvatar(
                                   backgroundColor:
-
                                   section.title.contains('가방')
                                       ? Colors.redAccent
                                       : section.title.contains('집')
@@ -249,7 +247,6 @@ class _ChecklistPageState extends State<ChecklistPage> {
                                 value: sectionPercent.toDouble(),
                                 minHeight: 6,
                                 color:
-
                                 section.title.contains('가방')
                                     ? Colors.redAccent
                                     : section.title.contains('집')
@@ -271,7 +268,6 @@ class _ChecklistPageState extends State<ChecklistPage> {
                       children: List.generate(section.items.length, (
                           itemIndex,
                           ) {
-
                         final item = section.items[itemIndex];
                         return Container(
                           margin: const EdgeInsets.symmetric(vertical: 4),
@@ -288,7 +284,6 @@ class _ChecklistPageState extends State<ChecklistPage> {
                               checkedStates[sectionIndex][itemIndex]
                                   ? Color(0x00aaaaaa)
                                   : Color(0x54BFBFBF),
-
                               width: 1.5,
                             ),
                           ),
@@ -297,7 +292,6 @@ class _ChecklistPageState extends State<ChecklistPage> {
                               item,
                               style: TextStyle(
                                 decoration:
-
                                 checkedStates[sectionIndex][itemIndex]
                                     ? TextDecoration
                                     .lineThrough // 체크되면 줄긋기
