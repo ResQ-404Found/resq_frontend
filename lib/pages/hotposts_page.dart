@@ -1,6 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+const Map<int, String> regionNames = {
+  1: '서울특별시',
+  2559: '부산광역시',
+  2784: '대구광역시',
+  3011: '인천광역시',
+  3235: '광주광역시',
+  3481: '대전광역시',
+  3664: '울산광역시',
+  3759: '세종특별자치시',
+  3793: '경기도',
+  5660: '강원도',
+  6129: '충청북도',
+  6580: '충청남도',
+  7376: '전라북도',
+  8143: '전라남도',
+  9073: '경상북도',
+  10404: '경상남도',
+  11977: '제주도',
+};
 
 class HotPostsPage extends StatefulWidget {
   const HotPostsPage({super.key});
@@ -9,24 +30,110 @@ class HotPostsPage extends StatefulWidget {
   State<HotPostsPage> createState() => _HotPostsPageState();
 }
 
-class _HotPostsPageState extends State<HotPostsPage> {
+class _HotPostsPageState extends State<HotPostsPage>
+    with TickerProviderStateMixin {
   List<dynamic> posts = [];
+  List<bool> isLikedList = [];
+  List<int> likeCountList = [];
+  List<int> commentCountList = [];
+  final FlutterSecureStorage storage = const FlutterSecureStorage();
+  String? accessToken;
+  int selectedTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    fetchPosts();
+    loadTokenAndPosts();
   }
 
-  Future<void> fetchPosts() async {
-    final url = Uri.parse('http://54.253.211.96:8000/api/posts'); // 필요한 경우 hot posts용 API로 바꿔도 됨
+  Widget _buildBadge(int point) {
+    String label = 'Bronze';
+    Color color = Colors.brown;
+    IconData icon = Icons.military_tech;
+    if (point >= 5000) {
+      label = 'Platinum';
+      color = Colors.blueGrey;
+      icon = Icons.workspace_premium;
+    } else if (point >= 3000) {
+      label = 'Gold';
+      color = Colors.amber;
+      icon = Icons.emoji_events;
+    } else if (point >= 1000) {
+      label = 'Silver';
+      color = Colors.grey;
+      icon = Icons.military_tech;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> loadTokenAndPosts() async {
+    accessToken = await storage.read(key: 'accessToken');
+    await fetchPosts();
+  }
+
+  Future<void> fetchPosts({String? regionNames}) async {
+    String query = '?type=disaster';
+    if (selectedTabIndex == 1) {
+      query += '&sort=like_count';
+    }
+    if (regionNames != null) {
+      query += '&region=${Uri.encodeComponent(regionNames)}';
+    }
+
+    final url = Uri.parse('http://54.253.211.96:8000/api/posts$query');
+
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          posts = data;
-        });
+        posts = data;
+
+        // 임시 데이터 초기화
+        likeCountList = posts.map<int>((post) => post['like_count'] ?? 0).toList();
+        isLikedList = List.filled(posts.length, false);
+        commentCountList = List.filled(posts.length, 0);
+
+        setState(() {}); // 스켈레톤 or 로딩 상태 보여줄 수 있음
+
+        // 댓글 수와 좋아요 상태를 병렬로 가져오기
+        List<Future<void>> futures = [];
+
+        for (int i = 0; i < posts.length; i++) {
+          final postId = posts[i]['id'];
+          futures.add(fetchLikeStatus(postId).then((liked) {
+            isLikedList[i] = liked;
+          }));
+          futures.add(fetchCommentCount(postId).then((count) {
+            commentCountList[i] = count;
+          }));
+        }
+
+        await Future.wait(futures); // 모든 비동기 작업이 끝날 때까지 대기
+
+        if (mounted) {
+          setState(() {}); // 한 번만 setState로 갱신
+        }
       } else {
         print('게시글 불러오기 실패: ${response.statusCode}');
       }
@@ -35,138 +142,206 @@ class _HotPostsPageState extends State<HotPostsPage> {
     }
   }
 
+
+  Future<int> fetchCommentCount(int postId) async {
+    final url = Uri.parse('http://54.253.211.96:8000/api/comments/$postId');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return (data as List).length;
+      }
+    } catch (e) {
+      print('댓글 수 조회 오류: $e');
+    }
+    return 0;
+  }
+
+  Future<bool> fetchLikeStatus(int postId) async {
+    final url = Uri.parse(
+      'http://54.253.211.96:8000/api/posts/$postId/like/status',
+    );
+    try {
+      final response = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['data']['liked'] ?? false;
+      }
+    } catch (e) {
+      print('좋아요 상태 오류: $e');
+    }
+    return false;
+  }
+
+  Future<void> toggleLike(int index) async {
+    final postId = posts[index]['id'];
+    final isLiked = isLikedList[index];
+    final url = Uri.parse('http://54.253.211.96:8000/api/posts/$postId/like');
+    try {
+      final response = isLiked
+          ? await http.delete(
+        url,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      )
+          : await http.post(
+        url,
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          isLikedList[index] = !isLiked;
+          likeCountList[index] =
+              data['data']['like_count'] ?? likeCountList[index];
+        });
+      }
+    } catch (e) {
+      print('좋아요 토글 오류: $e');
+    }
+  }
+
+  String? resolveImageUrl(dynamic urls) {
+    if (urls is List && urls.isNotEmpty) {
+      final url = urls.first;
+      if (url.startsWith('/static')) {
+        return 'http://54.253.211.96:8000$url';
+      } else if (url.startsWith('http')) {
+        return url;
+      }
+    }
+    if (urls is String && urls.isNotEmpty) {
+      if (urls.startsWith('/static')) {
+        return 'http://54.253.211.96:8000$urls';
+      } else if (urls.startsWith('http')) {
+        return urls;
+      }
+    }
+    return null;
+  }
+
+  String parseTimeAgo(String time) {
+    final dateTime = DateTime.parse(time).toLocal();
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+    if (diff.inSeconds < 60) return '${diff.inSeconds}초 전';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+    if (diff.inHours < 24) return '${diff.inHours}시간 전';
+    if (diff.inDays == 1) return '어제';
+    return '${diff.inDays}일 전';
+  }
+
+  String getBadgeLabel(int point) {
+    if (point >= 5000) return 'Platinum';
+    if (point >= 3000) return 'Gold';
+    if (point >= 1000) return 'Silver';
+    return 'Bronze';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-
-      appBar: AppBar(
+    return DefaultTabController(
+      length: 2,
+      initialIndex: selectedTabIndex,
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left, size: 35),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          '인기글',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.tune, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(2.0),
-          child: Divider(
-            height: 1,
-            thickness: 3.0,
-            indent: 200,
-            endIndent: 200,
-            color: Colors.black54,
-          ),
-        ),
-      ),
-
-      body: ListView.builder(
-        itemCount: posts.length,
-        itemBuilder: (context, index) {
-          final post = posts[index];
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => Scaffold(
-                    appBar: AppBar(
-                      title: const Text('상세 페이지'),
-                      backgroundColor: Colors.white,
-                      iconTheme: const IconThemeData(color: Colors.black87),
-                      titleTextStyle: const TextStyle(
-                        color: Colors.black87,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      leading: IconButton(
-                        icon: const Icon(Icons.chevron_left, size: 35),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      elevation: 0,
-                    ),
-                    body: const Center(child: Text('상세 페이지 구현 예정')),
-                  ),
-                ),
-              );
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          title: const Text('재난게시글', style: TextStyle(color: Colors.black)),
+          centerTitle: true,
+          iconTheme: const IconThemeData(color: Colors.black),
+          bottom: TabBar(
+            onTap: (index) {
+              setState(() {
+                selectedTabIndex = index;
+              });
+              fetchPosts();
             },
-            child: PostCard(
-              username: '작성자 ${post['user_id']}',
-              timeAgo: post['created_at'] ?? '',
-              description: post['content'] ?? '',
-              location: '지역 ${post['region_id']}',
-              likes: post['like_count'] ?? 0,
-              comments: post['view_count'] ?? 0,
+            indicatorColor: Colors.black,
+            indicatorWeight: 2.5,
+            labelColor: Colors.black,
+            unselectedLabelColor: Colors.grey,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
             ),
-          );
-        },
-      ),
-
-      bottomNavigationBar: BottomAppBar(
-        color: Colors.white,
-        elevation: 10,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: Icon(Icons.home, color: Colors.grey[400]),
-                iconSize: 32,
-                onPressed: () => Navigator.pushNamed(context, '/map'),
-              ),
-              IconButton(
-                icon: Icon(Icons.chat, color: Colors.black),
-                iconSize: 32,
-                onPressed: () => Navigator.pushNamed(context, '/hotposts'),
-              ),
-              IconButton(
-                icon: Icon(Icons.groups, color: Colors.grey[400]),
-                iconSize: 32,
-                onPressed: () => Navigator.pushNamed(context, '/community'),
-              ),
-              IconButton(
-                icon: Icon(Icons.emergency_share, color: Colors.grey[400]),
-                iconSize: 32,
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: Icon(Icons.person, color: Colors.grey[400]),
-                iconSize: 32,
-                onPressed: () => Navigator.pushNamed(context, '/user'),
-              ),
-            ],
+            tabs: const [Tab(text: '전체글'), Tab(text: '인기글')],
           ),
+            actions: [
+        Theme(
+        data: Theme.of(context).copyWith(
+          popupMenuTheme: const PopupMenuThemeData(
+            color: Colors.white,
+          ),
+        ),
+          child: PopupMenuButton<String>(
+            icon: const Icon(Icons.tune, color: Colors.black),
+            onSelected: (selectedRegion) =>
+                fetchPosts(regionNames: selectedRegion),
+            itemBuilder: (context) => regionNames.values
+                .map(
+                  (region) => PopupMenuItem(
+                value: region,
+                child: Text(region),
+              ),
+            )
+                .toList(),
+          ),
+        ),
+          ],
+        ),
+        body: (posts.isEmpty || isLikedList.length != posts.length)
+            ? const Center(child: CircularProgressIndicator())
+            : ListView.builder(
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            final author = post['author'] ?? {};
+            final profileImageUrl = resolveImageUrl(author['profile_imageURL']);
+            final postImageUrl = resolveImageUrl(post['post_imageURLs']);
+            final username = author['username'] ?? '알 수 없음';
+            final point = author['point'] ?? 0;
+
+            return GestureDetector(
+              onTap: () {
+                Navigator.pushNamed(context, '/allpostdetail', arguments: post);
+              },
+              child: PostCard(
+                username: username,
+                point: point,
+                timeAgo: parseTimeAgo(post['created_at']),
+                description: post['content'] ?? '',
+                location: regionNames[post['region_id']] ?? '지역 정보 없음',
+                likes: likeCountList[index],
+                comments: commentCountList[index],
+                isLiked: isLikedList[index],
+                profileImageUrl: profileImageUrl,
+                postImageUrl: postImageUrl,
+                onLikePressed: () => toggleLike(index),
+                badgeWidget: _buildBadge(point),
+
+              ),
+            );
+          },
         ),
       ),
     );
   }
 }
 
-// PostCard 클래스는 그대로 사용
-
 class PostCard extends StatelessWidget {
-  final String username;
-  final String timeAgo;
-  final String description;
-  final String location;
-  final int likes;
-  final int comments;
+  final String username, timeAgo, description, location;
+  final int likes, comments, point;
+  final bool isLiked;
+  final String? profileImageUrl;
+  final String? postImageUrl;
+  final VoidCallback onLikePressed;
+  final Widget badgeWidget;
+
 
   const PostCard({
     super.key,
@@ -176,109 +351,125 @@ class PostCard extends StatelessWidget {
     required this.location,
     required this.likes,
     required this.comments,
+    required this.isLiked,
+    required this.profileImageUrl,
+    required this.postImageUrl,
+    required this.onLikePressed,
+    required this.point,
+    required this.badgeWidget,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.redAccent, width: 1),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 8.0, right: 12.0),
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.grey,
-              child: Icon(Icons.person, color: Colors.white),
-            ),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundImage: profileImageUrl != null
+                    ? NetworkImage(profileImageUrl!)
+                    : const AssetImage('lib/asset/sample_profile.jpg') as ImageProvider,
+                backgroundColor: Colors.grey[200],
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      const SizedBox(width: 6),
+                      badgeWidget,
+                    ],
+                  ),
+                  Text(timeAgo, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                ],
+              ),
+            ],
           ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Text(description, style: const TextStyle(fontSize: 14)),
+          ),
+
+          // 이미지 있을 때만 표시
+          if (postImageUrl != null)
+            Column(
               children: [
-                // 유저명 + 시간 + 위치
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          username,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    postImageUrl!,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return SizedBox(
+                        height: 180,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                                : null,
                           ),
                         ),
-                        Row(
-                          children: [
-                            Text(
-                              timeAgo,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.location_pin,
-                              size: 16,
-                              color: Colors.red,
-                            ),
-                            Text(
-                              location,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const Icon(Icons.more_vert, color: Colors.black54),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Center(
-                  child: Icon(Icons.image, size: 300, color: Colors.grey[400]),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Text(
-                    description,
-                    style: const TextStyle(fontSize: 18),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox.shrink(),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.favorite_border, size: 25),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$likes',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Icon(Icons.comment, size: 25),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$comments',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: onLikePressed,
+                child: Row(
+                  children: [
+                    Icon(isLiked ? Icons.favorite : Icons.favorite_border,
+                        color: Colors.redAccent, size: 20),
+                    const SizedBox(width: 4),
+                    Text('$likes', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Icon(Icons.comment, size: 20, color: Colors.blueAccent),
+              const SizedBox(width: 4),
+              Text('$comments', style: const TextStyle(fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(location, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+              ),
+            ],
           ),
         ],
       ),

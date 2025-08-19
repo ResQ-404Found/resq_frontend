@@ -7,8 +7,15 @@ import 'routes.dart';
 import 'pages/disaster_detail_page.dart';
 import 'pages/map_page.dart';
 import 'pages/initial_page.dart';
-
 import 'package:permission_handler/permission_handler.dart';
+
+final mockDisaster = Disaster(
+  region: '부산광역시',
+  type: '태풍',
+  disasterLevel: '경계',
+  startTime: '2025-07-21 14:30',
+  info: '태풍 카눈이 부산에 접근 중입니다. 해안가 접근을 삼가시고 실내에 머무르시기 바랍니다. 시설물 피해 및 침수 주의 바랍니다.',
+);
 
 Future<void> requestNotificationPermission() async {
   final status = await Permission.notification.status;
@@ -18,13 +25,13 @@ Future<void> requestNotificationPermission() async {
   }
 }
 
-// 🔔 로컬 알림 플러그인 초기화
+
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
 
-// 🔔 알림 채널 정의
+
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
-  'default_channel_id', // AndroidManifest.xml과 일치
+  'default_channel_id',
   '기본 채널',
   description: '기본 알림 채널입니다.',
   importance: Importance.high,
@@ -40,16 +47,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await requestNotificationPermission();
-  // ✅ 백그라운드 핸들러 등록
+
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // ✅ 알림 채널 생성
   await flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<
       AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  // ✅ 로컬 알림 초기화
   await flutterLocalNotificationsPlugin.initialize(
     const InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -82,7 +87,6 @@ void main() async {
       print("❌ 알림이 없거나 android 설정이 null입니다");
     }
   });
-  // ✅ Initialize Naver Map
   final naverMap = FlutterNaverMap();
   await naverMap.init(
     clientId: 'p9nizolo1p',
@@ -116,6 +120,7 @@ class _MyAppState extends State<MyApp> {
         ...routes,
         '/initial': (context) => const InitialPage(),
       },
+
       onGenerateRoute: (settings) {
         if (settings.name == '/disasterDetail') {
           final disaster = settings.arguments as Disaster;
@@ -123,8 +128,15 @@ class _MyAppState extends State<MyApp> {
             builder: (context) => DisasterDetailPage(disaster: disaster),
           );
         }
-        return null;
+
+
+        return MaterialPageRoute(
+          builder: (context) => const Scaffold(
+            body: Center(child: Text('페이지를 찾을 수 없습니다')),
+          ),
+        );
       },
+
     );
   }
 }

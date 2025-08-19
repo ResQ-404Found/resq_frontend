@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
+import 'dart:async'; 
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -20,6 +21,8 @@ class _LoginPageState extends State<LoginPage> {
   final FocusNode _emailFocus = FocusNode();
   final FocusNode _passwordFocus = FocusNode();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+
+  static const Duration _httpTimeout = Duration(seconds: 10);
 
   @override
   void initState() {
@@ -40,8 +43,11 @@ class _LoginPageState extends State<LoginPage> {
     final accessToken = await _secureStorage.read(key: 'accessToken');
     final refreshToken = await _secureStorage.read(key: 'refreshToken');
 
+    if (!mounted) return;
+
     if (accessToken != null) {
       final success = await _validateAccessToken(accessToken);
+      if (!mounted) return;
       if (success) {
         Navigator.pushReplacementNamed(context, '/map');
         return;
@@ -50,6 +56,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (refreshToken != null) {
       final newAccessToken = await _refreshAccessToken(refreshToken);
+      if (!mounted) return;
       if (newAccessToken != null) {
         await _secureStorage.write(key: 'accessToken', value: newAccessToken);
         Navigator.pushReplacementNamed(context, '/map');
@@ -57,38 +64,63 @@ class _LoginPageState extends State<LoginPage> {
       }
     }
 
+
     print('자동 로그인 실패 → 로그인 페이지 유지');
   }
 
   Future<bool> _validateAccessToken(String accessToken) async {
     try {
-      final res = await http.get(
-        Uri.parse('http://54.253.211.96:8000/api/users/me'),
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-        },
-      );
+      final res = await http
+          .get(
+            Uri.parse('http://54.253.211.96:8000/api/users/me'),
+            headers: {'Authorization': 'Bearer $accessToken'},
+          )
+          .timeout(_httpTimeout);
+
       return res.statusCode == 200;
-    } catch (_) {
+    } on TimeoutException {
+      // ignore: avoid_print
+      print('[validateToken] timeout');
+      return false;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[validateToken] error: $e');
       return false;
     }
   }
 
   Future<String?> _refreshAccessToken(String refreshToken) async {
     try {
-      final res = await http.post(
-        Uri.parse('http://54.253.211.96:8000/api/refresh'),
-        headers: {
-          'Authorization': 'Bearer $refreshToken',
-          'Content-Type': 'application/json',
-        },
-      );
-      if (res.statusCode == 200) {
-        final json = jsonDecode(res.body);
-        return json['access_token'];
+      final res = await http
+          .post(
+            Uri.parse('http://54.253.211.96:8000/api/refresh'),
+            headers: {
+              'Authorization': 'Bearer $refreshToken',
+              'Content-Type': 'application/json',
+            },
+          )
+          .timeout(_httpTimeout);
+
+      final bodyText = res.body;
+      Map<String, dynamic>? bodyJson;
+      try {
+        bodyJson = jsonDecode(bodyText);
+      } catch (_) {
+        bodyJson = null;
       }
+
+      if (res.statusCode == 200) {
+        return bodyJson?['access_token'];
+      } else {
+        // ignore: avoid_print
+        print('[refresh] status=${res.statusCode} body=$bodyText');
+      }
+    } on TimeoutException {
+      // ignore: avoid_print
+      print('[refresh] timeout');
     } catch (e) {
-      print('🔁 토큰 갱신 실패: $e');
+      // ignore: avoid_print
+      print('토큰 갱신 실패: $e');
     }
     return null;
   }
@@ -98,50 +130,71 @@ class _LoginPageState extends State<LoginPage> {
     final password = _passwordController.text;
 
     if (loginId.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('아이디와 비밀번호를 모두 입력해주세요')),
-      );
+      _show('아이디와 비밀번호를 모두 입력해주세요');
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      final res = await http.post(
-        Uri.parse('http://54.253.211.96:8000/api/users/signin'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'login_id': loginId, 'password': password}),
-      );
+      final res = await http
+          .post(
+            Uri.parse('http://54.253.211.96:8000/api/users/signin'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'login_id': loginId, 'password': password}),
+          )
+          .timeout(_httpTimeout);
+
+      final bodyText = res.body; 
+      Map<String, dynamic>? bodyJson;
+      try {
+        bodyJson = jsonDecode(bodyText);
+      } catch (_) {
+        bodyJson = null;
+      }
 
       if (res.statusCode == 200) {
-        final json = jsonDecode(res.body);
-        final accessToken = json['data']['access_token'];
-        final refreshToken = json['data']['refresh_token'];
+        final data = bodyJson?['data'] ?? {};
+        final accessToken = data['access_token'];
+        final refreshToken = data['refresh_token'];
 
-        await _secureStorage.write(key: 'accessToken', value: accessToken);
-        await _secureStorage.write(key: 'refreshToken', value: refreshToken);
+        if (accessToken == null || refreshToken == null) {
+          _show('응답에 토큰이 없습니다. 잠시 후 다시 시도해주세요.');
+        } else {
+          await _secureStorage.write(key: 'accessToken', value: accessToken);
+          await _secureStorage.write(key: 'refreshToken', value: refreshToken);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인 성공')),
-        );
-
-        Navigator.pushReplacementNamed(context, '/map');
+          _show('로그인 성공');
+          if (!mounted) return;
+          Navigator.pushReplacementNamed(context, '/map');
+        }
       } else if (res.statusCode == 401) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('아이디 또는 비밀번호가 틀렸습니다')),
-        );
+        _show('아이디 또는 비밀번호가 틀렸습니다');
+      } else if (res.statusCode >= 400 && res.statusCode < 500) {
+        final msg =
+            bodyJson?['message'] ??
+            bodyJson?['detail'] ??
+            '요청이 올바르지 않습니다. (코드 ${res.statusCode})';
+        _show(msg);
+      } else if (res.statusCode >= 500) {
+        _show('서버에 문제가 발생했습니다. 잠시 후 다시 시도해주세요. (코드 ${res.statusCode})');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('서버 오류: ${res.statusCode}')),
-        );
+        _show('예상치 못한 응답입니다. (코드 ${res.statusCode})');
       }
+
+      print('[signin] status=${res.statusCode} body=$bodyText');
+    } on TimeoutException {
+      _show('요청 시간이 초과됐습니다. 네트워크를 확인 후 다시 시도해주세요.');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 오류: $e')),
-      );
+      _show('네트워크 오류: $e');
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  void _show(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Widget buildEmail() {
@@ -152,8 +205,7 @@ class _LoginPageState extends State<LoginPage> {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color:  Colors.red.withOpacity(0.15),
-
+            color: Colors.red.withOpacity(0.15),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -184,8 +236,7 @@ class _LoginPageState extends State<LoginPage> {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color:  Colors.red.withOpacity(0.15),
-
+            color: Colors.red.withOpacity(0.15),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -207,11 +258,7 @@ class _LoginPageState extends State<LoginPage> {
               showPassword ? Icons.visibility : Icons.visibility_off,
               color: Colors.grey,
             ),
-            onPressed: () {
-              setState(() {
-                showPassword = !showPassword;
-              });
-            },
+            onPressed: () => setState(() => showPassword = !showPassword),
           ),
         ),
         onChanged: (_) => setState(() {}),
@@ -223,15 +270,11 @@ class _LoginPageState extends State<LoginPage> {
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/password_reset_request');
-        },
+        onPressed:
+            () => Navigator.pushNamed(context, '/password_reset_request'),
         child: const Text(
           '비밀번호 찾기',
-          style: TextStyle(
-            color: Colors.grey,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -251,19 +294,24 @@ class _LoginPageState extends State<LoginPage> {
           backgroundColor: Colors.red,
           elevation: 5,
         ),
-        child: isLoading
-            ? const SizedBox(
-          height: 20,
-          width: 20,
-          child: CircularProgressIndicator(
-            color: Colors.white,
-            strokeWidth: 2,
-          ),
-        )
-            : const Text(
-          '로그인',
-          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        child:
+            isLoading
+                ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+                : const Text(
+                  '로그인',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
       ),
     );
   }
@@ -272,19 +320,25 @@ class _LoginPageState extends State<LoginPage> {
     return Padding(
       padding: const EdgeInsets.only(top: 30),
       child: GestureDetector(
-        onTap: () {
-          Navigator.pushNamed(context, '/signup');
-        },
+        onTap: () => Navigator.pushNamed(context, '/signup'),
         child: RichText(
           text: const TextSpan(
             children: [
               TextSpan(
                 text: '계정이 없으신가요?  ',
-                style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               TextSpan(
                 text: '회원가입',
-                style: TextStyle(color: Colors.red, fontSize: 15, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -306,7 +360,11 @@ class _LoginPageState extends State<LoginPage> {
               const Text(
                 '로그인',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.red),
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.red,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 20),
@@ -314,7 +372,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const SizedBox(height: 30),
                     buildEmail(),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                     buildPassword(),
                     const SizedBox(height: 3),
                     buildForgotPasswordButton(),
@@ -322,9 +380,8 @@ class _LoginPageState extends State<LoginPage> {
                     buildSignUpBtn(),
                     const SizedBox(height: 12),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacementNamed(context, '/map');
-                      },
+                      onTap:
+                          () => Navigator.pushReplacementNamed(context, '/map'),
                       child: const Text(
                         '비회원 로그인',
                         style: TextStyle(

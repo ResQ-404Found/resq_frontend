@@ -343,7 +343,7 @@ class _RegionCategoryPageState extends State<RegionCategoryPage> {
     '광주광역시': ['광산구', '남구', '동구', '북구', '서구'],
     '대전광역시': ['대덕구', '동구', '서구', '중구', '유성구'],
     '울산광역시': ['남구', '동구', '북구', '울주군', '중구'],
-    '세종특별자치시': [],
+    '세종특별자치시': ['세종특별자치시'],
     '경기도': [
       '가평군',
       '고양시',
@@ -610,96 +610,99 @@ class _RegionCategoryPageState extends State<RegionCategoryPage> {
   @override
   Widget build(BuildContext context) {
     final visibleRegions =
-    regionData.entries
-        .where((e) => e.value.isNotEmpty || e.key == '세종특별자치시')
-        .toList();
+    regionData.entries.where((e) => e.value.isNotEmpty).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('지역 선택'),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0.5,
-        scrolledUnderElevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 6,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            title: Text('지역 선택', style: TextStyle(color:Colors.black)),
+            foregroundColor: Colors.black,
+            leading: IconButton(
+              icon: const Icon(Icons.chevron_left, size: 35),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
         ),
       ),
       backgroundColor: const Color(0xFFF9FAFB),
       body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.3,
-          ),
-          itemCount: visibleRegions.length,
-          itemBuilder: (context, index) {
-            final regionName = visibleRegions[index].key;
-            final subCount = visibleRegions[index].value.length;
-            final regionId =
-                regionIdToName.entries
-                    .firstWhere(
-                      (e) => e.value == regionName,
-                  orElse: () => const MapEntry(-1, ''),
-                )
-                    .key;
-            final isSelected = notificationRegionMap.containsKey(regionId);
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Column(
+          children: [
+            const SizedBox(height: 12), // 앱바와 첫 박스 사이 간격 추가
+            Expanded(
+              child: ListView.builder(
+                itemCount: visibleRegions.length,
+                itemBuilder: (context, index) {
+                  final regionName = visibleRegions[index].key;
+                  final subCount = visibleRegions[index].value.length;
+                  final regionId = regionIdToName.entries
+                      .firstWhere(
+                        (e) => e.value == regionName,
+                    orElse: () => const MapEntry(-1, ''),
+                  )
+                      .key;
+                  final isSelected = notificationRegionMap.containsKey(regionId);
 
-            return GestureDetector(
-              onTap: () async {
-                if (regionName == '세종특별자치시') {
-                  if (regionId == -1) return;
-
-                  if (isSelected) {
-                    await _deleteNotificationRegion(regionId);
-                  } else {
-                    await _addNotificationRegion(regionId);
-                  }
-
-                  setState(() {});
-                } else {
-                  _showSubRegionModal(context, regionName);
-                }
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color:
-                  regionName == '세종특별자치시'
-                      ? (isSelected ? Colors.lightBlue[100] : Colors.white)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 8),
-                    Text(
-                      regionName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    if (subCount > 0)
-                      Text(
-                        '$subCount개 지역',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                  return GestureDetector(
+                    onTap: () async {
+                      _showSubRegionModal(context, regionName);
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 20,
                       ),
-                  ],
-                ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            regionName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (subCount > 0)
+                            Text(
+                              '$subCount개 지역',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
     );
@@ -715,16 +718,13 @@ class _RegionCategoryPageState extends State<RegionCategoryPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder:
-          (context) => StatefulBuilder(
-        builder:
-            (context, setModalState) => DraggableScrollableSheet(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => DraggableScrollableSheet(
           expand: false,
           initialChildSize: 0.6,
           minChildSize: 0.4,
           maxChildSize: 0.9,
-          builder:
-              (context, scrollController) => SingleChildScrollView(
+          builder: (context, scrollController) => SingleChildScrollView(
             controller: scrollController,
             padding: const EdgeInsets.symmetric(
               horizontal: 20,
@@ -761,17 +761,13 @@ class _RegionCategoryPageState extends State<RegionCategoryPage> {
                     alignment: WrapAlignment.center,
                     spacing: 35,
                     runSpacing: 20,
-                    children:
-                    subRegions.map((sub) {
-                      final matched = regionIdToName.entries
-                          .firstWhere(
+                    children: subRegions.map((sub) {
+                      final matched = regionIdToName.entries.firstWhere(
                             (e) => e.value == sub,
-                        orElse:
-                            () => const MapEntry(-1, ''),
+                        orElse: () => const MapEntry(-1, ''),
                       );
                       final regionId = matched.key;
-                      final isNotified = notificationRegionMap
-                          .containsKey(regionId);
+                      final isNotified = notificationRegionMap.containsKey(regionId);
 
                       return GestureDetector(
                         onTap: () async {
@@ -795,10 +791,7 @@ class _RegionCategoryPageState extends State<RegionCategoryPage> {
                             vertical: 14,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                            isNotified
-                                ? Colors.lightBlue[100]
-                                : Colors.grey[200],
+                            color: isNotified ? Colors.red: Colors.grey[200],
                             borderRadius: BorderRadius.circular(
                               10,
                             ),
@@ -807,10 +800,13 @@ class _RegionCategoryPageState extends State<RegionCategoryPage> {
                             child: Text(
                               sub,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
+                                color: isNotified ? Colors.white : Colors.black,
+                                fontWeight:  isNotified ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
+
                           ),
                         ),
                       );

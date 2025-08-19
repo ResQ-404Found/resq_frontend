@@ -257,6 +257,7 @@ class _NewsPageState extends State<NewsPage> {
     _imageCache[id] = img;
     _imageLoading.remove(id);
     if (mounted) setState(() {});
+
     return img;
   }
 
@@ -326,6 +327,7 @@ class _NewsPageState extends State<NewsPage> {
         ),
       ),
       body:
+
       isInitialLoading
           ? const Center(child: CircularProgressIndicator())
           : CustomScrollView(
@@ -542,6 +544,7 @@ class _NewsPageState extends State<NewsPage> {
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
         ],
       ),
+
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
@@ -556,6 +559,7 @@ class _NewsPageState extends State<NewsPage> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child:
+
       isSummaryLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -592,6 +596,7 @@ class _NewsPageState extends State<NewsPage> {
           ),
         ],
       ),
+
     );
   }
 
@@ -668,6 +673,7 @@ class _NewsPageState extends State<NewsPage> {
                     cacheWidth: 400,
                     errorBuilder:
                         (_, __, ___) => Container(
+
                       width: 100,
                       height: 80,
                       color: Colors.grey[200],
@@ -678,6 +684,7 @@ class _NewsPageState extends State<NewsPage> {
                         color: Colors.grey,
                       ),
                     ),
+
                   );
                 },
               ),
