@@ -8,10 +8,11 @@
         android:label="resq_frontend"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
         <!-- Firebase 알림 채널 설정 -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="default_channel_id" />
+            android:value="emergency_high" />
 
         <activity
             android:name=".MainActivity"
