@@ -25,10 +25,8 @@ Future<void> requestNotificationPermission() async {
   }
 }
 
-
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
-
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'default_channel_id',
@@ -55,11 +53,12 @@ void main() async {
       AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  await flutterLocalNotificationsPlugin.initialize(
-    const InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-    ),
+  // ✅ 초기화 시 앱 로고 아이콘 사용
+  const initializationSettings = InitializationSettings(
+    android: AndroidInitializationSettings('@drawable/logo'),
   );
+
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     print("🔔 알림 수신: ${message.notification?.title} / ${message.notification?.body}");
@@ -79,7 +78,7 @@ void main() async {
             channelDescription: '기본 알림 채널입니다.',
             importance: Importance.high,
             priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
+            icon: '@drawable/logo', // ✅ 여기서도 앱 로고 아이콘 지정
           ),
         ),
       );
@@ -87,6 +86,7 @@ void main() async {
       print("❌ 알림이 없거나 android 설정이 null입니다");
     }
   });
+
   final naverMap = FlutterNaverMap();
   await naverMap.init(
     clientId: 'p9nizolo1p',
@@ -105,12 +105,6 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   @override
-  void initState() {
-    super.initState();
-
-  }
-
-  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -120,7 +114,6 @@ class _MyAppState extends State<MyApp> {
         ...routes,
         '/initial': (context) => const InitialPage(),
       },
-
       onGenerateRoute: (settings) {
         if (settings.name == '/disasterDetail') {
           final disaster = settings.arguments as Disaster;
@@ -128,15 +121,12 @@ class _MyAppState extends State<MyApp> {
             builder: (context) => DisasterDetailPage(disaster: disaster),
           );
         }
-
-
         return MaterialPageRoute(
           builder: (context) => const Scaffold(
             body: Center(child: Text('페이지를 찾을 수 없습니다')),
           ),
         );
       },
-
     );
   }
 }

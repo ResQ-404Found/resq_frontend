@@ -64,13 +64,13 @@ class HttpClient {
   static Future<Map<String, dynamic>> uploadProfileImage({
     required String token,
     required File imageFile,
-    required String imageUrl, 
+    required String imageUrl,
   }) async {
     final uri = Uri.parse('$baseUrl/users/profile-image');
     final request =
-        http.MultipartRequest('PATCH', uri)
-          ..headers['Authorization'] = 'Bearer $token'
-          ..fields['image_url'] = imageUrl; 
+    http.MultipartRequest('PATCH', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['image_url'] = imageUrl;
 
     final exists = await imageFile.exists();
     final fileSize = await imageFile.length();
@@ -81,7 +81,7 @@ class HttpClient {
 
     request.files.add(
       await http.MultipartFile.fromPath(
-        'file', 
+        'file',
         imageFile.path,
       ),
     );
