@@ -254,9 +254,10 @@ class _NewsPageState extends State<NewsPage> {
       img = await _fetchOgImage(url);
     }
 
-    _imageCache[id] = img; 
+    _imageCache[id] = img;
     _imageLoading.remove(id);
-    if (mounted) setState(() {}); 
+    if (mounted) setState(() {});
+
     return img;
   }
 
@@ -326,222 +327,224 @@ class _NewsPageState extends State<NewsPage> {
         ),
       ),
       body:
-          isInitialLoading
-              ? const Center(child: CircularProgressIndicator())
-              : CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: ElevatedButton.icon(
-                          onPressed:
-                              isSummaryLoading
-                                  ? null
-                                  : () {
-                                    if (showSummary) {
-                                      setState(() => showSummary = false);
-                                    } else {
-                                      fetchAISummary();
-                                    }
-                                  },
-                          icon: const Icon(Icons.smart_toy),
-                          label: Text(
-                            isSummaryLoading ? '요약 불러오는 중…' : 'AI 요약 보기',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
+
+      isInitialLoading
+          ? const Center(child: CircularProgressIndicator())
+          : CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ElevatedButton.icon(
+                  onPressed:
+                  isSummaryLoading
+                      ? null
+                      : () {
+                    if (showSummary) {
+                      setState(() => showSummary = false);
+                    } else {
+                      fetchAISummary();
+                    }
+                  },
+                  icon: const Icon(Icons.smart_toy),
+                  label: Text(
+                    isSummaryLoading ? '요약 불러오는 중…' : 'AI 요약 보기',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          if (showSummary)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: _buildSummaryCard(),
+              ),
+            ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(40, 0, 20, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '재난 관련 영상',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 200,
+              child:
+              _isYoutubeLoading || youtubeVideos.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : PageView.builder(
+                controller: _pageController,
+                itemCount: youtubeVideos.length,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentYoutubePage = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final video = youtubeVideos[index];
+                  return GestureDetector(
+                    onTap:
+                        () =>
+                        launchUrlString(video['videoUrl']),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(
+                              0.05,
                             ),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
                           ),
-                        ),
+                        ],
                       ),
-                    ),
-                  ),
-
-                  if (showSummary)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                        child: _buildSummaryCard(),
-                      ),
-                    ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(40, 0, 20, 4),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '재난 관련 영상',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 200,
-                      child:
-                          _isYoutubeLoading || youtubeVideos.isEmpty
-                              ? const Center(child: CircularProgressIndicator())
-                              : PageView.builder(
-                                controller: _pageController,
-                                itemCount: youtubeVideos.length,
-                                onPageChanged: (index) {
-                                  setState(() {
-                                    _currentYoutubePage = index;
-                                  });
-                                },
-                                itemBuilder: (context, index) {
-                                  final video = youtubeVideos[index];
-                                  return GestureDetector(
-                                    onTap:
-                                        () =>
-                                            launchUrlString(video['videoUrl']),
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        color: Colors.white,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.05,
-                                            ),
-                                            blurRadius: 6,
-                                            offset: const Offset(0, 3),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                            child: Image.network(
-                                              video['thumbnail'],
-                                              width: 320,
-                                              height: 175,
-                                              fit: BoxFit.cover,
-                                              cacheWidth: 640,
-                                              cacheHeight: 350,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            video['channel'] ?? '',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                    ),
-                  ),
-                  if (youtubeVideos.isNotEmpty)
-                    SliverToBoxAdapter(
                       child: Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 10),
-                          SmoothPageIndicator(
-                            controller: _pageController,
-                            count: youtubeVideos.length,
-                            effect: WormEffect(
-                              dotHeight: 8,
-                              dotWidth: 8,
-                              activeDotColor: Colors.black,
-                              dotColor: Colors.grey[300]!,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              12,
                             ),
+                            child: Image.network(
+                              video['thumbnail'],
+                              width: 320,
+                              height: 175,
+                              fit: BoxFit.cover,
+                              cacheWidth: 640,
+                              cacheHeight: 350,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            video['channel'] ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                  if (newsList.isEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 40),
-                        child: Center(
-                          child: Text(
-                            _isNewsLoading ? '' : '표시할 뉴스가 없습니다.',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      sliver: SliverList.builder(
-                        itemCount: newsList.length,
-                        itemBuilder: (context, index) {
-                          final news = newsList[index];
-                          return _buildNewsTile(news);
-                        },
-                      ),
-                    ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                  SliverToBoxAdapter(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.chevron_left),
-                          onPressed:
-                              currentPage > 0
-                                  ? () => goToPage(currentPage - 1)
-                                  : null,
-                        ),
-                        Text(
-                          '${currentPage + 1} / $totalPages',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.chevron_right),
-                          onPressed:
-                              (currentPage < totalPages - 1)
-                                  ? () => goToPage(currentPage + 1)
-                                  : null,
-                        ),
-                      ],
+                  );
+                },
+              ),
+            ),
+          ),
+          if (youtubeVideos.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  SmoothPageIndicator(
+                    controller: _pageController,
+                    count: youtubeVideos.length,
+                    effect: WormEffect(
+                      dotHeight: 8,
+                      dotWidth: 8,
+                      activeDotColor: Colors.black,
+                      dotColor: Colors.grey[300]!,
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
                 ],
               ),
+            ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+          if (newsList.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Text(
+                    _isNewsLoading ? '' : '표시할 뉴스가 없습니다.',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              sliver: SliverList.builder(
+                itemCount: newsList.length,
+                itemBuilder: (context, index) {
+                  final news = newsList[index];
+                  return _buildNewsTile(news);
+                },
+              ),
+            ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+          SliverToBoxAdapter(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed:
+                  currentPage > 0
+                      ? () => goToPage(currentPage - 1)
+                      : null,
+                ),
+                Text(
+                  '${currentPage + 1} / $totalPages',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed:
+                  (currentPage < totalPages - 1)
+                      ? () => goToPage(currentPage + 1)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        ],
+      ),
+
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
@@ -556,42 +559,44 @@ class _NewsPageState extends State<NewsPage> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child:
-          isSummaryLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _cleanedSummary(aiSummary),
-                    style: const TextStyle(fontSize: 16),
+
+      isSummaryLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _cleanedSummary(aiSummary),
+            style: const TextStyle(fontSize: 16),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+            _extractKeywords(aiSummary).map((keyword) {
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  keyword,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children:
-                        _extractKeywords(aiSummary).map((keyword) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              keyword,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                  ),
-                ],
-              ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+
     );
   }
 
@@ -668,16 +673,18 @@ class _NewsPageState extends State<NewsPage> {
                     cacheWidth: 400,
                     errorBuilder:
                         (_, __, ___) => Container(
-                          width: 100,
-                          height: 80,
-                          color: Colors.grey[200],
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.broken_image,
-                            size: 30,
-                            color: Colors.grey,
-                          ),
-                        ),
+
+                      width: 100,
+                      height: 80,
+                      color: Colors.grey[200],
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image,
+                        size: 30,
+                        color: Colors.grey,
+                      ),
+                    ),
+
                   );
                 },
               ),

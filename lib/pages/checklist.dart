@@ -165,7 +165,8 @@ class _ChecklistPageState extends State<ChecklistPage> {
                       checkedStates[sectionIndex].where((e) => e).length;
                   final sectionTotal = section.items.length;
                   final sectionPercent =
-                      sectionTotal == 0 ? 0 : (sectionDone / sectionTotal);
+
+                  sectionTotal == 0 ? 0 : (sectionDone / sectionTotal);
                   final isSectionCompleted = sectionDone == sectionTotal;
                   return Container(
                     padding: const EdgeInsets.all(12),
@@ -191,17 +192,18 @@ class _ChecklistPageState extends State<ChecklistPage> {
                                 ), // 왼쪽 8, 오른쪽 12 간격 추가
                                 child: CircleAvatar(
                                   backgroundColor:
-                                      section.title.contains('가방')
-                                          ? Colors.redAccent
-                                          : section.title.contains('집')
-                                          ? Colors.orangeAccent
-                                          : section.title.contains('의약품')
-                                          ? Colors.green
-                                          : section.title.contains('마을')
-                                          ? Colors.blueAccent
-                                          : section.title.contains('화생방')
-                                          ? Colors.deepPurple
-                                          : Colors.indigo,
+
+                                  section.title.contains('가방')
+                                      ? Colors.redAccent
+                                      : section.title.contains('집')
+                                      ? Colors.orangeAccent
+                                      : section.title.contains('의약품')
+                                      ? Colors.green
+                                      : section.title.contains('마을')
+                                      ? Colors.blueAccent
+                                      : section.title.contains('화생방')
+                                      ? Colors.deepPurple
+                                      : Colors.indigo,
                                   child: Icon(
                                     section.icon,
                                     color: Colors.white,
@@ -247,17 +249,18 @@ class _ChecklistPageState extends State<ChecklistPage> {
                                 value: sectionPercent.toDouble(),
                                 minHeight: 6,
                                 color:
-                                    section.title.contains('가방')
-                                        ? Colors.redAccent
-                                        : section.title.contains('집')
-                                        ? Colors.orangeAccent
-                                        : section.title.contains('의약품')
-                                        ? Colors.green
-                                        : section.title.contains('마을')
-                                        ? Colors.blueAccent
-                                        : section.title.contains('화생방')
-                                        ? Colors.deepPurple
-                                        : Colors.indigo,
+
+                                section.title.contains('가방')
+                                    ? Colors.redAccent
+                                    : section.title.contains('집')
+                                    ? Colors.orangeAccent
+                                    : section.title.contains('의약품')
+                                    ? Colors.green
+                                    : section.title.contains('마을')
+                                    ? Colors.blueAccent
+                                    : section.title.contains('화생방')
+                                    ? Colors.deepPurple
+                                    : Colors.indigo,
                                 backgroundColor: Colors.grey.shade300,
                               ),
                             ),
@@ -266,24 +269,26 @@ class _ChecklistPageState extends State<ChecklistPage> {
                       ),
 
                       children: List.generate(section.items.length, (
-                        itemIndex,
-                      ) {
+                          itemIndex,
+                          ) {
+
                         final item = section.items[itemIndex];
                         return Container(
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           decoration: BoxDecoration(
                             color:
-                                checkedStates[sectionIndex][itemIndex]
-                                    ? Colors
-                                        .grey
-                                        .shade100 // 체크되면 연한 회색 배경
-                                    : Colors.white, // 체크 안 됐으면 흰색
+                            checkedStates[sectionIndex][itemIndex]
+                                ? Colors
+                                .grey
+                                .shade100 // 체크되면 연한 회색 배경
+                                : Colors.white, // 체크 안 됐으면 흰색
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color:
-                                  checkedStates[sectionIndex][itemIndex]
-                                      ? Color(0x00aaaaaa)
-                                      : Color(0x54BFBFBF),
+                              checkedStates[sectionIndex][itemIndex]
+                                  ? Color(0x00aaaaaa)
+                                  : Color(0x54BFBFBF),
+
                               width: 1.5,
                             ),
                           ),
@@ -292,10 +297,11 @@ class _ChecklistPageState extends State<ChecklistPage> {
                               item,
                               style: TextStyle(
                                 decoration:
-                                    checkedStates[sectionIndex][itemIndex]
-                                        ? TextDecoration
-                                            .lineThrough // 체크되면 줄긋기
-                                        : TextDecoration.none,
+
+                                checkedStates[sectionIndex][itemIndex]
+                                    ? TextDecoration
+                                    .lineThrough // 체크되면 줄긋기
+                                    : TextDecoration.none,
                               ),
                             ),
                             value: checkedStates[sectionIndex][itemIndex],
