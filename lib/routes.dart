@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:resq_frontend/pages/all_post_detail_page.dart';
+import 'package:resq_frontend/pages/donation_list_page.dart';
+import 'package:resq_frontend/pages/quiz.dart';
+import 'package:resq_frontend/pages/quiz_start_page.dart';
+import 'pages/disaster_guide_page.dart';
 import 'pages/disastertype_filtering_page.dart';
+import 'pages/donation_detail_page.dart';
+import 'pages/donation_payment_page.dart';
 import 'pages/region_category_page.dart';
 import 'pages/signup_page.dart';
 import 'pages/login_page.dart';
@@ -12,19 +19,18 @@ import 'pages/writepost_page.dart';
 import 'pages/hotposts_page.dart';
 import 'pages/withdrawl_page.dart';
 import 'pages/disaster_menu_page.dart';
-import 'pages/fire_page.dart';
-import 'pages/landslide_page.dart';
-import 'pages/flood_page.dart';
-import 'pages/typhoon_page.dart';
-import 'pages/earthquake_page.dart';
-import 'pages/coldwave_page.dart';
-import 'pages/disaster_list_page.dart';
 import 'pages/password_reset_new_page.dart';
 import 'pages/password_reset_request_page.dart';
 import 'pages/password_reset_verify_page.dart';
 import 'pages/initial_page.dart';
+import 'pages/checklist.dart';
+import 'pages/news_page.dart';
+import 'pages/my_post_detail_page.dart';
+import 'pages/all_disaster_type_detail_page.dart';
+
 
 final Map<String, WidgetBuilder> routes = {
+  '/all-disasters': (context) => const AllDisasterTypeDetailPage(),
   '/initial': (context) => const InitialPage(),
   '/login': (context) => LoginPage(),
   '/signup': (context) => SignUpPage(),
@@ -37,15 +43,36 @@ final Map<String, WidgetBuilder> routes = {
   '/createpost': (context) => PostCreatePage(),
   '/withdrawl': (context) => WithdrawalConfirmationPage(),
   '/disastermenu': (context) => DisasterMenuPage(),
-  '/fire': (context) => const FirePage(),
-  '/landslide': (context) => const LandslidePage(),
-  '/flood': (context) => const FloodPage(),
-  '/typhoon': (context) => const TyphoonPage(),
-  '/earthquake': (context) => const EarthquakePage(),
-  '/coldwave': (context) => const ColdwavePage(),
+  '/fire': (context) => DisasterGuidePage(initialIndex: 0),
+  '/landslide': (context) => DisasterGuidePage(initialIndex: 1),
+  '/flood': (context) => DisasterGuidePage(initialIndex: 2),
+  '/typhoon': (context) => DisasterGuidePage(initialIndex: 3),
+  '/earthquake': (context) => DisasterGuidePage(initialIndex: 4),
+  '/coldwave': (context) => DisasterGuidePage(initialIndex: 5),
   '/region-filter': (context) => RegionCategoryPage(),
   '/type-filter': (context) => NotificationSettingsPage(),
-  '/disasterlist': (context) => const DisasterListPage(),
+  '/disasterlist': (context) => DisasterGuidePage(initialIndex: 0),
+  '/checklist' : (context) => const ChecklistPage(),
+  '/news': (context) => NewsPage(),
+  '/postDetail': (context) => const PostDetailPage(),
+  '/donation': (context) => DonationListPage(),
+  '/detail': (context) => DonationDetailPage(),
+  '/quiz': (context) => const QuizPage(),
+  '/quiz/start': (context) {
+    final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+    return QuizStartPage(
+      quizId: args['id'],
+      title: args['title'],
+      timeMinutes: args['minutes'],
+      questions: args['questions'],
+    );
+  },
+  '/payment': (context) => DonationPaymentPage(),
+  '/allpostdetail': (context) {
+    final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+    return AllPostDetailPage(post: args);
+  },
+
   '/password_reset_request' : (context) => const PasswordResetRequestPage(),
   '/password_reset_verify': (context) {
     final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
@@ -58,8 +85,5 @@ final Map<String, WidgetBuilder> routes = {
       code: args['code'],
     );
   },
-
-
-
 
 };
