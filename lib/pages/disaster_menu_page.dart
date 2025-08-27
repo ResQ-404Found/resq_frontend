@@ -5,6 +5,7 @@ import 'disaster_guide_page.dart';
 import 'checklist.dart';
 import 'all_disaster_type_detail_page.dart';
 import 'app_bottom_nav.dart';
+import 'friend_page.dart';
 import 'donation_list_page.dart';
 import 'news_page.dart';
 
@@ -14,10 +15,16 @@ class DisasterMenuPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final menuItems = [
+      // {
+      //   'title': '전체 재난 정보',
+      //   'subtitle': '전체 재난 기록 확인',
+      //   'icon': Icons.warning_amber_rounded,
+      //   'color': Colors.redAccent,
+      // },
       {
-        'title': '전체 재난 정보',
-        'subtitle': '전체 재난 기록 확인',
-        'icon': Icons.warning_amber_rounded,
+        'title': '친구',
+        'subtitle': '비상 시 연락망',
+        'icon': Icons.account_box_rounded,
         'color': Colors.redAccent,
       },
       {
@@ -26,31 +33,31 @@ class DisasterMenuPage extends StatelessWidget {
         'icon': Icons.security,
         'color': Colors.orangeAccent,
       },
-      {
-        'title': '체크리스트',
-        'subtitle': '재난 대비 점검 항목',
-        'icon': Icons.check_box,
-        'color': Colors.teal,
-      },
+      // {
+      //   'title': '체크리스트',
+      //   'subtitle': '재난 대비 점검 항목',
+      //   'icon': Icons.check_box,
+      //   'color': Colors.teal,
+      // },
       {
         'title': '뉴스',
         'subtitle': '재난 관련 최신 소식',
         'icon': Icons.article,
-        'color': Colors.blueAccent,
+        'color': Colors.teal,
       },
       {
         'title': '후원',
         'subtitle': '재난 구호를 위한 기부',
         'icon': Icons.volunteer_activism,
-        'color': Colors.purpleAccent,
+        'color': Colors.indigoAccent,
       },
-      // ✅ 후원 밑에 추가된 항목
       {
         'title': '퀴즈',
         'subtitle': '재난 상식 테스트',
         'icon': Icons.quiz,
-        'color': Colors.indigoAccent,
+        'color': Colors.purpleAccent,
       },
+
     ];
 
     return Scaffold(
@@ -82,25 +89,43 @@ class DisasterMenuPage extends StatelessWidget {
                 return GestureDetector(
                   onTap: () {
                     final title = item['title'] as String;
-                    if (title == '전체 재난 정보') {
+                    // if (title == '전체 재난 정보') {
+                    //   Navigator.push(
+                    //     context,
+                    //     MaterialPageRoute(
+                    //       builder: (_) => const AllDisasterTypeDetailPage(),
+                    //     ),
+                    //   );
+                   //}
+                    //else
+                      if (title == '친구') {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const AllDisasterTypeDetailPage(),
+                          builder: (_) => const EmergencyContactsPage(),
                         ),
                       );
-                    } else if (title == '대피 방법') {
+                    }else if (title == '대피 방법') {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => DisasterGuidePage(initialIndex: 0),
                         ),
                       );
-                    } else if (title == '체크리스트') {
+                    }
+                    // } else if (title == '체크리스트') {
+                    //   Navigator.push(
+                    //     context,
+                    //     MaterialPageRoute(
+                    //       builder: (_) => const ChecklistPage(),
+                    //     ),
+                    //   );
+                   // }
+                    else if (title == '뉴스') {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const ChecklistPage(),
+                          builder: (_) => const NewsPage(),
                         ),
                       );
                     } else if (title == '뉴스') {
