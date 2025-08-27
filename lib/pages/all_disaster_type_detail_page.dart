@@ -176,112 +176,112 @@ class _AllDisasterTypeDetailPageState extends State<AllDisasterTypeDetailPage> {
                         context: context,
                         builder:
                             (context) => Dialog(
-                              backgroundColor: Colors.transparent,
-                              insetPadding: const EdgeInsets.symmetric(
-                                horizontal: 24,
+                          backgroundColor: Colors.transparent,
+                          insetPadding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                          ),
+                          child: Material(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            clipBehavior: Clip.antiAlias,
+                            child: Container(
+                              constraints: const BoxConstraints(
+                                maxHeight: 500,
                               ),
-                              child: Material(
+                              decoration: const BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                clipBehavior: Clip.antiAlias,
-                                child: Container(
-                                  constraints: const BoxConstraints(
-                                    maxHeight: 500,
-                                  ),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: double.infinity,
-                                        color: Colors.grey[100],
-                                        padding: const EdgeInsets.only(
-                                          top: 22,
-                                          bottom: 12,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: double.infinity,
+                                    color: Colors.grey[100],
+                                    padding: const EdgeInsets.only(
+                                      top: 22,
+                                      bottom: 12,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        const Text(
+                                          '재난 유형 변경',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
+                                          ),
                                         ),
-                                        child: Column(
-                                          children: [
-                                            const Text(
-                                              '재난 유형 변경',
-                                              style: TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.black,
-                                              ),
-                                            ),
-                                            const SizedBox(
-                                              height: 4,
-                                            ),
-                                            // const Divider(height: 1, thickness: 0.5),
-                                          ],
+                                        const SizedBox(
+                                          height: 4,
                                         ),
-                                      ),
+                                        // const Divider(height: 1, thickness: 0.5),
+                                      ],
+                                    ),
+                                  ),
 
-                                      Flexible(
-                                        child: ListView.builder(
-                                          shrinkWrap: true,
-                                          itemCount: disasterTypes.length,
-                                          itemBuilder: (context, index) {
-                                            final type = disasterTypes[index];
-                                            final icon =
-                                                iconMap[type] ??
+                                  Flexible(
+                                    child: ListView.builder(
+                                      shrinkWrap: true,
+                                      itemCount: disasterTypes.length,
+                                      itemBuilder: (context, index) {
+                                        final type = disasterTypes[index];
+                                        final icon =
+                                            iconMap[type] ??
                                                 Icons.more_horiz;
-                                            final color =
-                                                colorMap[type] ?? Colors.grey;
+                                        final color =
+                                            colorMap[type] ?? Colors.grey;
 
-                                            return Column(
-                                              children: [
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        left: 8.0,
-                                                      ),
-                                                  child: ListTile(
-                                                    tileColor: Colors.white,
-                                                    leading: Icon(
-                                                      icon,
-                                                      color: color,
-                                                    ),
-                                                    title: Text(
-                                                      type,
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            type == selectedType
-                                                                ? FontWeight
-                                                                    .bold
-                                                                : FontWeight
-                                                                    .normal,
-                                                        color:
-                                                            type == selectedType
-                                                                ? Colors.black
-                                                                : Colors
-                                                                    .grey[600],
-                                                      ),
-                                                    ),
-                                                    onTap: () {
-                                                      setState(() {
-                                                        selectedType = type;
-                                                      });
-                                                      Navigator.pop(context);
-                                                    },
+                                        return Column(
+                                          children: [
+                                            Padding(
+                                              padding:
+                                              const EdgeInsets.only(
+                                                left: 8.0,
+                                              ),
+                                              child: ListTile(
+                                                tileColor: Colors.white,
+                                                leading: Icon(
+                                                  icon,
+                                                  color: color,
+                                                ),
+                                                title: Text(
+                                                  type,
+                                                  style: TextStyle(
+                                                    fontWeight:
+                                                    type == selectedType
+                                                        ? FontWeight
+                                                        .bold
+                                                        : FontWeight
+                                                        .normal,
+                                                    color:
+                                                    type == selectedType
+                                                        ? Colors.black
+                                                        : Colors
+                                                        .grey[600],
                                                   ),
                                                 ),
-                                                const Divider(
-                                                  height: 1,
-                                                  thickness: 0.5,
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
+                                                onTap: () {
+                                                  setState(() {
+                                                    selectedType = type;
+                                                  });
+                                                  Navigator.pop(context);
+                                                },
+                                              ),
+                                            ),
+                                            const Divider(
+                                              height: 1,
+                                              thickness: 0.5,
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -344,9 +344,9 @@ class _DisasterTypeDetailViewState extends State<DisasterTypeDetailView> {
 
     final baseUrl = 'http://54.253.211.96:8000/api/disasters';
     final url =
-        widget.disasterType == '전체'
-            ? '$baseUrl?active_only=true'
-            : '$baseUrl?disaster_type=${Uri.encodeComponent(widget.disasterType)}&active_only=true';
+    widget.disasterType == '전체'
+        ? '$baseUrl?active_only=true'
+        : '$baseUrl?disaster_type=${Uri.encodeComponent(widget.disasterType)}&active_only=true';
 
     try {
       final response = await http.get(Uri.parse(url));

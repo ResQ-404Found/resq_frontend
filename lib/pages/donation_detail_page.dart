@@ -16,12 +16,14 @@ class DonationDetailPage extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading:
-            Navigator.canPop(context)
-                ? IconButton(
-                  icon: Icon(Icons.chevron_left, size: 35),
-                  onPressed: () => Navigator.pop(context),
-                )
-                : null,
+
+        Navigator.canPop(context)
+            ? IconButton(
+          icon: Icon(Icons.chevron_left, size: 35),
+          onPressed: () => Navigator.pop(context),
+        )
+            : null,
+
         title: Text('후원 상세'),
         centerTitle: true,
       ),
@@ -97,10 +99,12 @@ class DonationDetailPage extends StatelessWidget {
                     builder: (context, constraints) {
                       final double fullWidth = constraints.maxWidth;
                       final double progressWidth =
-                          max(
-                            0,
-                            fullWidth * donation.progress,
-                          ).toDouble(); // ✅ 수정 완료
+
+                      max(
+                        0,
+                        fullWidth * donation.progress,
+                      ).toDouble(); // ✅ 수정 완료
+
 
                       return Stack(
                         children: [
@@ -167,10 +171,12 @@ class DonationDetailPage extends StatelessWidget {
                   ),
                   onPressed:
                       () => Navigator.pushNamed(
-                        context,
-                        '/payment',
-                        arguments: donation,
-                      ),
+
+                    context,
+                    '/payment',
+                    arguments: donation,
+                  ),
+
                   child: const Text(
                     '후원하기',
                     style: TextStyle(

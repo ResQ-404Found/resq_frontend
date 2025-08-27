@@ -70,9 +70,6 @@ Future<void> requestNotificationPermission() async {
   }
 }
 
-/// =====================
-///  Local Notifications
-/// =====================
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
 
@@ -172,13 +169,13 @@ void main() async {
       .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  await flutterLocalNotificationsPlugin.initialize(
-    const InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-    ),
+  // ✅ 초기화 시 앱 로고 아이콘 사용
+  const initializationSettings = InitializationSettings(
+    android: AndroidInitializationSettings('@drawable/logo'),
   );
 
-  // 포그라운드 수신 → 로컬 알림 표시
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     final notification = message.notification;
     final android = message.notification?.android;
@@ -194,7 +191,7 @@ void main() async {
             channelDescription: '기본 알림 채널입니다.',
             importance: Importance.high,
             priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
+            icon: '@drawable/logo', // ✅ 여기서도 앱 로고 아이콘 지정
           ),
         ),
       );
