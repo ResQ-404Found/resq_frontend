@@ -6,7 +6,7 @@ import 'checklist.dart';
 import 'all_disaster_type_detail_page.dart';
 import 'app_bottom_nav.dart';
 import 'donation_list_page.dart';
-import 'news_page.dart'; // ✅ 공통 바텀바 추가
+import 'news_page.dart';
 
 class DisasterMenuPage extends StatelessWidget {
   const DisasterMenuPage({super.key});

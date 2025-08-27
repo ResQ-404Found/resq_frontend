@@ -94,11 +94,7 @@ class Hospital {
 }
 
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await NaverMapSdk.instance.initialize(clientId: 'l66gqrjxx3');
-  runApp(const MaterialApp(home: MapPage()));
-}
+
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -118,7 +114,10 @@ class _MapPageState extends State<MapPage> {
   String _selectedMenu = ''; // '', 'shelter', 'disaster'
   Hospital? _selectedHospital;
   final List<NMarker> _hospitalMarkers = [];
-
+  Position? _currentPosition;
+  bool _loadingShelters = false;
+  bool _loadingHospitals = false;
+  bool _loadingDisasters = false;
   @override
   void initState() {
     super.initState();
@@ -135,6 +134,7 @@ class _MapPageState extends State<MapPage> {
     }
 
     Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    _currentPosition = position;
     final userLatLng = NLatLng(position.latitude, position.longitude);
 
     if (_controller != null) {
@@ -180,96 +180,113 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _fetchNearbyShelters(Position position) async {
-    final url = Uri.parse('http://54.253.211.96:8000/api/shelters/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10');
-    final response = await http.get(url, headers: {'accept': 'application/json'});
+    setState(() => _loadingShelters = true);
+    try {
+      final url = Uri.parse('http://54.253.211.96:8000/api/shelters/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10');
+      final response = await http.get(url, headers: {'accept': 'application/json'});
 
-    if (response.statusCode == 200) {
-      final jsonBody = json.decode(utf8.decode(response.bodyBytes));
-      final List<dynamic> data = jsonBody is List ? jsonBody : jsonBody['data'];
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(utf8.decode(response.bodyBytes));
+        final List<dynamic> data = jsonBody is List ? jsonBody : jsonBody['data'];
 
-      _shelterMarkers.clear();
+        _shelterMarkers.clear();
 
-      for (var item in data) {
-        final shelter = Shelter.fromJson(item);
-        final marker = NMarker(
-          id: 'shelter_${shelter.latitude}_${shelter.longitude}',
-          position: NLatLng(shelter.latitude, shelter.longitude),
-          icon: NOverlayImage.fromAssetImage('lib/asset/shelter_marker.png'),
-          caption: NOverlayCaption(text: shelter.name),
-        );
-        marker.setOnTapListener((m) {
-          setState(() {
-            _selectedShelter =
-            (_selectedShelter?.name == shelter.name) ? null : shelter;
-            _showDisasterSheet = false;
+        for (var item in data) {
+          final shelter = Shelter.fromJson(item);
+          final marker = NMarker(
+            id: 'shelter_${shelter.latitude}_${shelter.longitude}',
+            position: NLatLng(shelter.latitude, shelter.longitude),
+            icon: NOverlayImage.fromAssetImage('lib/asset/shelter_marker.png'),
+            caption: NOverlayCaption(text: shelter.name),
+          );
+          marker.setOnTapListener((m) {
+            setState(() {
+              _selectedShelter =
+              (_selectedShelter?.name == shelter.name) ? null : shelter;
+              _showDisasterSheet = false;
+            });
           });
-        });
 
-        _shelterMarkers.add(marker);
-      }
+          _shelterMarkers.add(marker);
+        }
 
-      if (_controller != null) {
-        await _controller!.clearOverlays();
-        await _controller!.addOverlayAll(_shelterMarkers.map((m) => m as NAddableOverlay).toSet());
-        await _zoomToFitAllMarkers();
+        if (_controller != null) {
+          await _controller!.clearOverlays();
+          await _controller!.addOverlayAll(_shelterMarkers.map((m) => m as NAddableOverlay).toSet());
+          await _zoomToFitAllMarkers();
+        }
       }
+    } finally {
+      if (mounted) setState(() => _loadingShelters = false); // ✅ 종료
     }
+
   }
 
   Future<void> _fetchDisasters() async {
     if (_sido == null || _sigungu == null || _eupmyeondong == null) return;
-    final queryUri = Uri.parse('http://54.253.211.96:8000/api/disasters?sido=$_sido&sigungu=$_sigungu&eupmyeondong=$_eupmyeondong&active_only=true');
-    final response = await http.get(queryUri, headers: {'accept': 'application/json'});
+    setState(() => _loadingDisasters = true); // ✅ 시작
+    try {
+      final queryUri = Uri.parse('http://54.253.211.96:8000/api/disasters?sido=$_sido&sigungu=$_sigungu&eupmyeondong=$_eupmyeondong&active_only=true');
+      final response = await http.get(queryUri, headers: {'accept': 'application/json'});
 
-    if (response.statusCode == 200) {
-      final jsonBody = json.decode(utf8.decode(response.bodyBytes));
-      final summary = jsonBody['data'][0]['summary'] as Map<String, dynamic>;
-      final total = summary.values.fold<int>(0, (sum, val) => sum + (val as int));
-      final List<dynamic> data = jsonBody['data'][0]['disasters'];
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(utf8.decode(response.bodyBytes));
+        final summary = jsonBody['data'][0]['summary'] as Map<String, dynamic>;
+        final total = summary.values.fold<int>(0, (sum, val) => sum + (val as int));
+        final List<dynamic> data = jsonBody['data'][0]['disasters'];
 
-      setState(() {
-        _disasterList = data.map((e) => Disaster.fromJson(e)).toList();
-        _hasDisasterMessage = total > 0;
-        if (_selectedMenu == 'disaster') {
-          _showDisasterSheet = true;
-        }
-      });
+        setState(() {
+          _disasterList = data.map((e) => Disaster.fromJson(e)).toList();
+          _hasDisasterMessage = total > 0;
+          if (_selectedMenu == 'disaster') {
+            _showDisasterSheet = true;
+          }
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loadingDisasters = false); // ✅ 종료
     }
+
   }
 
   Future<void> _fetchNearbyHospitals(Position position) async {
-    final url = Uri.parse('http://54.253.211.96:8000/api/hospital/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10');
-    final response = await http.get(url, headers: {'accept': 'application/json'});
+    setState(() => _loadingHospitals = true);
+    try {
+      final url = Uri.parse('http://54.253.211.96:8000/api/hospital/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10');
+      final response = await http.get(url, headers: {'accept': 'application/json'});
 
-    if (response.statusCode == 200) {
-      final jsonBody = json.decode(utf8.decode(response.bodyBytes));
-      final List<dynamic> data = jsonBody is List ? jsonBody : jsonBody['data'];
+      if (response.statusCode == 200) {
+        final jsonBody = json.decode(utf8.decode(response.bodyBytes));
+        final List<dynamic> data = jsonBody is List ? jsonBody : jsonBody['data'];
 
-      _hospitalMarkers.clear();
+        _hospitalMarkers.clear();
 
-      for (var item in data) {
-        final hospital = Hospital.fromJson(item);
-        final marker = NMarker(
-          id: 'hospital_${hospital.latitude}_${hospital.longitude}',
-          position: NLatLng(hospital.latitude, hospital.longitude),
-          icon: NOverlayImage.fromAssetImage('lib/asset/hospital_marker.png'),
-          caption: NOverlayCaption(text: hospital.name),
-        );
-        marker.setOnTapListener((m) {
-          setState(() {
-            _selectedHospital = (_selectedHospital?.name == hospital.name) ? null : hospital;
+        for (var item in data) {
+          final hospital = Hospital.fromJson(item);
+          final marker = NMarker(
+            id: 'hospital_${hospital.latitude}_${hospital.longitude}',
+            position: NLatLng(hospital.latitude, hospital.longitude),
+            icon: NOverlayImage.fromAssetImage('lib/asset/hospital_marker.png'),
+            caption: NOverlayCaption(text: hospital.name),
+          );
+          marker.setOnTapListener((m) {
+            setState(() {
+              _selectedHospital = (_selectedHospital?.name == hospital.name) ? null : hospital;
+            });
           });
-        });
-        _hospitalMarkers.add(marker);
-      }
+          _hospitalMarkers.add(marker);
+        }
 
-      if (_controller != null) {
-        await _controller!.clearOverlays();
-        await _controller!.addOverlayAll(
-          _hospitalMarkers.map((m) => m as NAddableOverlay).toSet(),
-        ); //hospitalMarkers로 바꿈
-        await _zoomToFitMarkers(_hospitalMarkers);
+        if (_controller != null) {
+          await _controller!.clearOverlays();
+          await _controller!.addOverlayAll(
+            _hospitalMarkers.map((m) => m as NAddableOverlay).toSet(),
+          ); //hospitalMarkers로 바꿈
+          await _zoomToFitMarkers(_hospitalMarkers);
+        }
       }
+    } finally {
+      if (mounted) setState(() => _loadingHospitals = false); // ✅ 종료
     }
   }
 
@@ -336,6 +353,15 @@ class _MapPageState extends State<MapPage> {
                           });
                         },
                       ),
+                      if (_loadingShelters || _loadingHospitals || _loadingDisasters)
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.black.withOpacity(0.08),
+                            child: const Center(
+                              child: CircularProgressIndicator(), // 🔄 원하면 이미지로 교체 가능
+                            ),
+                          ),
+                        ),
                       AnimatedPositioned(
                         duration: const Duration(milliseconds: 360),
                         curve: Curves.easeOut,
@@ -481,12 +507,19 @@ class _MapPageState extends State<MapPage> {
   }) {
     final selected = _selectedMenu == value;
 
+    // 선택 시 색상 분기
+    Color activeColor;
+    if (value == 'shelter') {
+      activeColor = const Color(0xFF43A85B); // 초록
+    } else {
+      activeColor = Colors.red; // 빨강
+    }
+
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 92), // 더 작게
+      constraints: const BoxConstraints(minWidth: 92),
       child: GestureDetector(
         onTap: () async {
           setState(() {
-            // 같은 버튼 재탭 시 OFF
             final isSame = _selectedMenu == value;
             _selectedMenu = isSame ? '' : value;
             _selectedHospital = null;
@@ -504,31 +537,39 @@ class _MapPageState extends State<MapPage> {
           }
         },
         child: Container(
-          height: 40, // 높이 줄임
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? Colors.red.shade400 : Colors.grey[200],
+            color: Colors.white, // ✅ 항상 흰 배경
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected ? Colors.red : Colors.grey.shade300,
-              width: 1,
+              color: selected ? activeColor : Colors.grey.shade300, // ✅ 선택 시 초록/빨강
+              width: 1.2,
             ),
             boxShadow: [
               if (selected)
-                const BoxShadow(color: Colors.black26, offset: Offset(0, 2), blurRadius: 4),
+                BoxShadow(
+                  color: activeColor.withOpacity(0.4), // ✅ 선택된 색으로 그림자
+                  offset: const Offset(0, 2),
+                  blurRadius: 2,
+                ),
             ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: selected ? Colors.white : Colors.black),
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? activeColor : Colors.black87,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13, // 글자 조금 작게
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: selected ? Colors.white : Colors.black,
+                  color: selected ? activeColor : Colors.black87,
                 ),
               ),
             ],
@@ -537,61 +578,58 @@ class _MapPageState extends State<MapPage> {
       ),
     );
   }
+
+
   Widget _bellButton() {
-    final isOpen = _selectedMenu == 'disaster' && _showDisasterSheet;
-
-    return GestureDetector(
-      onTap: () async {
-        setState(() {
-          final turningOff = _selectedMenu == 'disaster' && _showDisasterSheet;
-          _selectedMenu = turningOff ? '' : 'disaster';
-          _selectedHospital = null;
-          _selectedShelter = null;
-          _showDisasterSheet = !turningOff;
-        });
-
-        if (_showDisasterSheet) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: () async {
           await _fetchDisasters();
-        }
-      },
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isOpen ? Colors.red : Colors.grey.shade300, width: 1),
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-        ),
-        child: Icon(
+          setState(() {
+            _selectedMenu = '';
+            _showDisasterSheet = false;
+            _selectedHospital = null;
+            _selectedShelter = null;
+          });
+
+          Navigator.pushNamed(
+            context,
+            '/disasters',
+            arguments: {
+              'sido': _sido ?? '',
+              'sigungu': _sigungu ?? '',
+              'eupmyeondong': _eupmyeondong ?? '',
+            },
+          );
+        },
+        child: const Icon(
           Icons.notifications_none_rounded,
-          size: 22,
-          color: isOpen ? Colors.red : Colors.black87,
+          size: 28,
+          color: Colors.black87,
         ),
       ),
     );
   }
 
+
+
+
   Widget _buildLocationActions() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-      height: 48,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      height: 52,
       child: Row(
         children: [
-          // 왼쪽: 대피소 / 병원 작은 필 버튼 2개
           _pillButton(label: '대피소', icon: Icons.favorite_border, value: 'shelter'),
           const SizedBox(width: 8),
           _pillButton(label: '병원', icon: Icons.local_hospital, value: 'hospital'),
-
           const Spacer(),
-
-          // 오른쪽: 종 아이콘 (재난정보 시트 토글)
           _bellButton(),
         ],
       ),
     );
   }
-
 
 
   Widget _buildStatusBanner() {
@@ -660,6 +698,10 @@ class _MapPageState extends State<MapPage> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
+            if (_currentAddress != null) ...[
+              _infoRow('내 위치', _currentAddress!),
+              const SizedBox(height: 6),
+            ],
             _infoRow('이름', shelter.name),
             _infoRow('주소', shelter.address),
             _infoRow('거리', '${(shelter.distance * 1000).toStringAsFixed(0)}m'),
@@ -738,14 +780,20 @@ class _MapPageState extends State<MapPage> {
                   final first = entry.value.first;
 
                   return GestureDetector(
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/disasterDetail',
-                        arguments: first,
-                      );
-                    },
-                    child: Container(
+                      onTap: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/disasters',
+                          arguments: {
+                            'sido': _sido ?? '',
+                            'sigungu': _sigungu ?? '',
+                            'eupmyeondong': _eupmyeondong ?? '',
+                          },
+                        );
+
+                      },
+
+                      child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.grey[100],
@@ -812,6 +860,11 @@ class _MapPageState extends State<MapPage> {
           children: [
             const Text('병원 상세 정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
+            if (_currentAddress != null) ...[
+              _infoRow('내 위치', _currentAddress!),
+              const SizedBox(height: 6),
+            ],
+
             _infoRow('이름', hospital.name),
             _infoRow('주소', hospital.address),
             _infoRow('거리', '${(hospital.distance * 1000).toStringAsFixed(0)}m'),

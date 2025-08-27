@@ -114,19 +114,6 @@ class _MyAppState extends State<MyApp> {
         ...routes,
         '/initial': (context) => const InitialPage(),
       },
-      onGenerateRoute: (settings) {
-        if (settings.name == '/disasterDetail') {
-          final disaster = settings.arguments as Disaster;
-          return MaterialPageRoute(
-            builder: (context) => DisasterDetailPage(disaster: disaster),
-          );
-        }
-        return MaterialPageRoute(
-          builder: (context) => const Scaffold(
-            body: Center(child: Text('페이지를 찾을 수 없습니다')),
-          ),
-        );
-      },
     );
   }
 }
