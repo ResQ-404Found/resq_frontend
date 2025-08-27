@@ -29,6 +29,9 @@ import 'pages/checklist.dart';
 import 'pages/news_page.dart';
 import 'pages/my_post_detail_page.dart';
 import 'pages/all_disaster_type_detail_page.dart';
+import 'pages/disaster_list_page.dart';
+import 'pages/disaster_detail_page.dart';
+import 'pages/map_page.dart'; // Disaster 타입 참조 필요 시
 
 
 final Map<String, WidgetBuilder> routes = {
@@ -71,6 +74,13 @@ final Map<String, WidgetBuilder> routes = {
     );
   },
 
+
+  '/disasters': (context) => DisasterListPage.fromRouteArgs(context),
+
+  '/disaster/detail': (context) {
+    final d = ModalRoute.of(context)!.settings.arguments as Disaster;
+    return DisasterDetailPage(disaster: d);
+  },
   '/payment': (context) => DonationPaymentPage(),
   '/allpostdetail': (context) {
     final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
