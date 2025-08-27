@@ -28,22 +28,29 @@ class DisasterMenuPage extends StatelessWidget {
         'icon': Icons.security,
         'color': Colors.orangeAccent,
       },
-      {
-        'title': '체크리스트',
-        'subtitle': '재난 대비 점검 항목',
-        'icon': Icons.check_box,
-        'color': Colors.teal,
-      },
+      // {
+      //   'title': '체크리스트',
+      //   'subtitle': '재난 대비 점검 항목',
+      //   'icon': Icons.check_box,
+      //   'color': Colors.teal,
+      // },
       {
         'title': '뉴스',
         'subtitle': '재난 관련 최신 소식',
         'icon': Icons.article,
-        'color': Colors.blueAccent,
+        'color': Colors.teal,
       },
       {
         'title': '후원',
         'subtitle': '재난 구호를 위한 기부',
         'icon': Icons.volunteer_activism,
+        'color': Colors.indigoAccent,
+      },
+      // ✅ 후원 밑에 추가된 항목
+      {
+        'title': '퀴즈',
+        'subtitle': '재난 상식 테스트',
+        'icon': Icons.quiz,
         'color': Colors.purpleAccent,
       },
     ];
@@ -98,6 +105,7 @@ class DisasterMenuPage extends StatelessWidget {
                           builder: (_) => DisasterGuidePage(initialIndex: 0),
                         ),
                       );
+                    }
                     // } else if (title == '체크리스트') {
                     //   Navigator.push(
                     //     context,
@@ -105,8 +113,14 @@ class DisasterMenuPage extends StatelessWidget {
                     //       builder: (_) => const ChecklistPage(),
                     //     ),
                     //   );
-                    } else if (title == '뉴스') {
-                      Navigator.pushNamed(context, '/news');
+                   // }
+                    else if (title == '뉴스') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NewsPage(),
+                        ),
+                      );
                     } else if (title == '후원') {
                       Navigator.pushNamed(context, '/donation');
                     }
