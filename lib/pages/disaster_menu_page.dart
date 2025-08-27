@@ -51,20 +51,13 @@ class DisasterMenuPage extends StatelessWidget {
         'icon': Icons.volunteer_activism,
         'color': Colors.indigoAccent,
       },
-      // ✅ 후원 밑에 추가된 항목
       {
         'title': '퀴즈',
         'subtitle': '재난 상식 테스트',
         'icon': Icons.quiz,
         'color': Colors.purpleAccent,
       },
-      // ✅ 후원 밑에 추가된 항목
-      {
-        'title': '퀴즈',
-        'subtitle': '재난 상식 테스트',
-        'icon': Icons.quiz,
-        'color': Colors.indigoAccent,
-      },
+
     ];
 
     return Scaffold(
@@ -96,14 +89,16 @@ class DisasterMenuPage extends StatelessWidget {
                 return GestureDetector(
                   onTap: () {
                     final title = item['title'] as String;
-                    if (title == '전체 재난 정보') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AllDisasterTypeDetailPage(),
-                        ),
-                      );
-                    }else if (title == '친구') {
+                    // if (title == '전체 재난 정보') {
+                    //   Navigator.push(
+                    //     context,
+                    //     MaterialPageRoute(
+                    //       builder: (_) => const AllDisasterTypeDetailPage(),
+                    //     ),
+                    //   );
+                   //}
+                    //else
+                      if (title == '친구') {
                       Navigator.push(
                         context,
                         MaterialPageRoute(

@@ -162,10 +162,11 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
     final roseSoft = const Color(0xFFFFE4E6);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7FA),
+      backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
         title: const Text('비상 연락처'),
         centerTitle: true,
+        backgroundColor: const Color(0xFFFFFFFF),
         actions: [
           IconButton(
             icon: const Icon(Icons.add_rounded),
