@@ -305,7 +305,7 @@ class _MapPageState extends State<MapPage> {
         child: Column(
           children: [
             _buildLocationBox(),
-            _buildLocationButtons(),
+            _buildLocationActions(),
             _buildStatusBanner(),
             Expanded(
               child: Padding(
@@ -474,95 +474,124 @@ class _MapPageState extends State<MapPage> {
 
     );
   }
+  Widget _pillButton({
+    required String label,
+    required IconData icon,
+    required String value,
+  }) {
+    final selected = _selectedMenu == value;
 
-  Widget _buildLocationButtons() {
-    final List<Map<String, dynamic>> buttons = [
-      {'label': '대피소', 'icon': Icons.favorite_border, 'value': 'shelter'},
-      {'label': '재난정보', 'icon': Icons.warning_amber, 'value': 'disaster'},
-      {'label': '병원', 'icon': Icons.local_hospital, 'value': 'hospital'},
-    ];
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 92), // 더 작게
+      child: GestureDetector(
+        onTap: () async {
+          setState(() {
+            // 같은 버튼 재탭 시 OFF
+            final isSame = _selectedMenu == value;
+            _selectedMenu = isSame ? '' : value;
+            _selectedHospital = null;
+            _selectedShelter = null;
+            _showDisasterSheet = false;
+          });
 
+          if (_selectedMenu == 'shelter') {
+            final pos = await Geolocator.getCurrentPosition();
+            await _fetchNearbyShelters(pos);
+          }
+          if (_selectedMenu == 'hospital') {
+            final pos = await Geolocator.getCurrentPosition();
+            await _fetchNearbyHospitals(pos);
+          }
+        },
+        child: Container(
+          height: 40, // 높이 줄임
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: selected ? Colors.red.shade400 : Colors.grey[200],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? Colors.red : Colors.grey.shade300,
+              width: 1,
+            ),
+            boxShadow: [
+              if (selected)
+                const BoxShadow(color: Colors.black26, offset: Offset(0, 2), blurRadius: 4),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: selected ? Colors.white : Colors.black),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13, // 글자 조금 작게
+                  fontWeight: FontWeight.w500,
+                  color: selected ? Colors.white : Colors.black,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  Widget _bellButton() {
+    final isOpen = _selectedMenu == 'disaster' && _showDisasterSheet;
+
+    return GestureDetector(
+      onTap: () async {
+        setState(() {
+          final turningOff = _selectedMenu == 'disaster' && _showDisasterSheet;
+          _selectedMenu = turningOff ? '' : 'disaster';
+          _selectedHospital = null;
+          _selectedShelter = null;
+          _showDisasterSheet = !turningOff;
+        });
+
+        if (_showDisasterSheet) {
+          await _fetchDisasters();
+        }
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isOpen ? Colors.red : Colors.grey.shade300, width: 1),
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        ),
+        child: Icon(
+          Icons.notifications_none_rounded,
+          size: 22,
+          color: isOpen ? Colors.red : Colors.black87,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationActions() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       height: 48,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: buttons.map((b) {
-          final selected = _selectedMenu == b['value'];
+        children: [
+          // 왼쪽: 대피소 / 병원 작은 필 버튼 2개
+          _pillButton(label: '대피소', icon: Icons.favorite_border, value: 'shelter'),
+          const SizedBox(width: 8),
+          _pillButton(label: '병원', icon: Icons.local_hospital, value: 'hospital'),
 
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              child: GestureDetector(
-                onTap: () async {
-                  setState(() {
-                    if (_selectedMenu == b['value']) {
-                      // 이미 선택된 버튼 다시 누르면 → OFF
-                      _selectedMenu = '';
-                      _selectedHospital = null;
-                      _selectedShelter = null;
-                      _showDisasterSheet = false;
-                    } else {
-                      _selectedMenu = b['value'] as String;
-                      _selectedHospital = null;
-                      _selectedShelter = null; // ✅ 이 줄로 상세 시트도 OFF
-                      _showDisasterSheet = (_selectedMenu == 'disaster');
-                    }
-                  });
+          const Spacer(),
 
-                  Position pos = await Geolocator.getCurrentPosition();
-                  if (_selectedMenu == 'shelter') await _fetchNearbyShelters(pos);
-                  if (_selectedMenu == 'hospital') await _fetchNearbyHospitals(pos);
-                  if (_selectedMenu == 'disaster') await _fetchDisasters();
-                },
-
-
-
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: selected ? Colors.red.shade400 : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selected ? Colors.red : Colors.grey.shade300,
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      if (selected)
-                        const BoxShadow(
-                          color: Colors.black26,
-                          offset: Offset(0, 2),
-                          blurRadius: 4,
-                        )
-                    ],
-                  ),
-
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(b['icon'] as IconData,
-                            color: selected ? Colors.white : Colors.black),
-                        const SizedBox(width: 6),
-                        Text(
-                          b['label'] as String,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: selected ? Colors.white : Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
+          // 오른쪽: 종 아이콘 (재난정보 시트 토글)
+          _bellButton(),
+        ],
       ),
     );
   }
+
 
 
   Widget _buildStatusBanner() {
