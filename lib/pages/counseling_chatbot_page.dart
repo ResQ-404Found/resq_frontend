@@ -21,8 +21,8 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
   bool _isTyping = false;
 
   static const String baseUrl = 'http://54.253.211.96:8000';
-  static const String historyPath = '/api/counseling/history';
-  static const String chatPath = '/api/counseling/chat';
+  static const String historyPath = '/api/chatbot/counseling/history';
+  static const String chatPath = '/api/chatbot/counseling';
 
   @override
   void initState() {

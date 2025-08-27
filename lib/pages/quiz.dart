@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class QuizPage extends StatefulWidget {
   const QuizPage({super.key});
@@ -9,7 +12,6 @@ class QuizPage extends StatefulWidget {
 
 class _QuizPageState extends State<QuizPage> {
   final List<String> categories = ['전체', '지진', '화재', '태풍', '홍수'];
-
   String selected = '전체';
 
   final List<QuizItem> allQuizzes = [
@@ -82,7 +84,6 @@ class _QuizPageState extends State<QuizPage> {
         child: Column(
           children: [
             const SizedBox(height: 8),
-            // 카테고리 칩
             SizedBox(
               height: 46,
               child: ListView.separated(
@@ -116,7 +117,6 @@ class _QuizPageState extends State<QuizPage> {
               ),
             ),
             const SizedBox(height: 12),
-            // 카드 리스트
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -133,16 +133,100 @@ class _QuizPageState extends State<QuizPage> {
     );
   }
 
-  // ✅ 여기만 변경: 퀴즈 시작 페이지로 라우팅
-  void _handleStart(QuizItem item) {
-    Navigator.pushNamed(
-      context,
-      '/quiz/start',
-      arguments: {
-        'id': item.id,
-        'title': item.title,
-        'minutes': item.minutes,
-        // 'questions': fetchedQuestions, // 서버에서 받아온 문제가 있으면 전달
+  Future<bool> _isLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    return token != null && token.isNotEmpty;
+  }
+
+  void _handleStart(QuizItem item) async {
+    final isLoggedIn = await _isLoggedIn();
+
+    if (!isLoggedIn) {
+      _showLoginRequiredDialog();
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken');
+
+      final response = await http.post(
+        Uri.parse('http://54.253.211.96:8000/quiz/generate'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(<String, dynamic>{
+          'category': item.category,
+          'topic': item.title,
+          'n_questions': item.questions,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+        final List<dynamic> fetchedQuestions = data['questions'];
+
+        Navigator.pushNamed(
+          context,
+          '/quiz/start',
+          arguments: {
+            'id': item.id,
+            'title': item.title,
+            'minutes': item.minutes,
+            'questions': fetchedQuestions,
+          },
+        );
+      } else {
+        print('API 호출 실패: ${response.statusCode}');
+        _showErrorDialog('퀴즈를 불러오는 데 실패했습니다.');
+      }
+    } catch (e) {
+      print('네트워크 오류 발생: $e');
+      _showErrorDialog('네트워크 오류가 발생했습니다. 다시 시도해 주세요.');
+    }
+  }
+
+  void _showLoginRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          // ✨ 여기 수정: 배경색을 흰색으로 지정
+          backgroundColor: Colors.white,
+          title: const Text('로그인 필요'),
+          content: const Text('퀴즈를 시작하려면 로그인해야 합니다.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white, // 에러 다이얼로그도 흰색 배경으로 통일
+          title: const Text('오류'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
       },
     );
   }
@@ -215,7 +299,6 @@ class QuizCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // 이미지
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               child: Stack(
@@ -255,7 +338,6 @@ class QuizCard extends StatelessWidget {
                 ],
               ),
             ),
-            // 본문
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
               child: Column(
@@ -324,7 +406,6 @@ class QuizCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  // 시작 버튼
                   SizedBox(
                     width: double.infinity,
                     height: 48,
