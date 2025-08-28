@@ -186,9 +186,10 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: const Icon(Icons.chevron_left, size: 35,color:Colors.white),
                   onPressed: () => Navigator.pop(context),
                 ),
+
                 Container(
                   width: 34,
                   height: 34,
@@ -214,10 +215,6 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
                         ),
                       ),
                       SizedBox(height: 4),
-                      Text(
-                        '온라인',
-                        style: TextStyle(color: Colors.white70, fontSize: 12.5),
-                      ),
                     ],
                   ),
                 ),
@@ -343,12 +340,15 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
             onTap: () => _sendMessage(label),
             borderRadius: BorderRadius.circular(20),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 5,),
               decoration: BoxDecoration(
                 color: Colors.white, // ← 안 흰색
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: const Color(0xFFE53935)), // ← 빨강 테두리
               ),
+              alignment: Alignment.center,
               child: Text(
                 label,
                 style: const TextStyle(

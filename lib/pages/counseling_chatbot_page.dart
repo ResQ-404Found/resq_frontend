@@ -195,9 +195,10 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: const Icon(Icons.chevron_left, size: 35,color:Colors.white),
                   onPressed: () => Navigator.pop(context),
                 ),
+
                 Container(
                   width: 34,
                   height: 34,
@@ -222,8 +223,6 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
                         ),
                       ),
                       SizedBox(height: 4),
-                      Text('온라인',
-                          style: TextStyle(color: Colors.white70, fontSize: 12.5)),
                     ],
                   ),
                 ),
@@ -269,17 +268,21 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
             onTap: () => _sendMessage(label),
             borderRadius: BorderRadius.circular(20),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 5,
+              ),
               decoration: BoxDecoration(
                 color: Colors.white, // ← 안 흰색
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFBBDEFB)),
+                border: Border.all(color: const Color(0xFF1E87E3)),
               ),
+              alignment: Alignment.center,
               child: Text(
                 label,
                 style: const TextStyle(
                   fontSize: 12.5,
-                  color: Color(0xFFBBDEFB),
+                  color: Color(0xFF1E87E3),
                   fontWeight: FontWeight.w600,
                 ),
               ),
