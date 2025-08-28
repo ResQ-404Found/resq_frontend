@@ -693,7 +693,7 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
 
             await Navigator.pushNamed(
               context,
-              AppRoutes.allDisasters, // '/all-disasters'
+              AppRoutes.disasterlist,    // '/all-disasters'
               arguments: {
                 'sido': _sido ?? '',
                 'sigungu': _sigungu ?? '',

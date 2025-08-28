@@ -36,8 +36,8 @@ import 'pages/counseling_chatbot_page.dart';
 import 'pages/user/role_gate.dart';
 import 'pages/quiz.dart';
 import 'pages/quiz_details.dart';
-
-
+import 'pages/disaster_list_page.dart';
+import 'pages/disaster_detail_page.dart';
 /// Central place for route names
 class AppRoutes {
   static const root = '/';
@@ -169,7 +169,7 @@ class AppRouter {
         return _page(NotificationSettingsPage());
 
       case AppRoutes.disasterlist:
-        return _page(const DisasterGuidePage(initialIndex: 0));
+        return _page(DisasterListPage.fromRouteSettings(settings));
 
       case AppRoutes.checklist:
         return _page(const ChecklistPage());

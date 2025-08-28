@@ -17,15 +17,16 @@ class DisasterListPage extends StatefulWidget {
     required this.eupmyeondong,
   });
 
-  /// 라우트에서 args 파싱 헬퍼
-  static Widget fromRouteArgs(BuildContext context) {
-    final args = ModalRoute.of(context)!.settings.arguments as Map?;
+
+  static DisasterListPage fromRouteSettings(RouteSettings settings) {
+    final args = settings.arguments as Map?;
     return DisasterListPage(
       sido: (args?['sido'] as String?) ?? '',
       sigungu: (args?['sigungu'] as String?) ?? '',
       eupmyeondong: (args?['eupmyeondong'] as String?) ?? '',
     );
   }
+
 
   @override
   State<DisasterListPage> createState() => _DisasterListPageState();
