@@ -1,44 +1,66 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
-class QuizStartPage extends StatefulWidget {
-  final String quizId;
+const int kFixedPoint = 10; // ✅ 전부 정답 시 지급되는 고정 포인트
+
+class QuizQuestion {
+  final String question;
+  final List<String> options;
+  final int correctIndex;
+  final String explanation;
+
+  QuizQuestion({
+    required this.question,
+    required this.options,
+    required this.correctIndex,
+    required this.explanation,
+  });
+}
+
+class QuizDetailsPage extends StatefulWidget {
   final String title;
   final int timeMinutes;
 
-  /// 실제 서비스에서는 서버에서 문제를 받아오면 됩니다.
-  /// 여기서는 화면 테스트를 위해 리스트를 직접 넣거나, null이면 샘플 데이터를 씁니다.
-  final List<QuizQuestion>? questions;
+  final String category;
+  final String topic;
+  final int nQuestions;
 
-  const QuizStartPage({
+  const QuizDetailsPage({
     super.key,
-    required this.quizId,
     required this.title,
     required this.timeMinutes,
-    this.questions,
+    required this.category,
+    required this.topic,
+    required this.nQuestions,
   });
 
   @override
-  State<QuizStartPage> createState() => _QuizStartPageState();
+  State<QuizDetailsPage> createState() => _QuizDetailsPageState();
 }
 
-class _QuizStartPageState extends State<QuizStartPage> {
-  late final List<QuizQuestion> _questions;
+class _QuizDetailsPageState extends State<QuizDetailsPage> {
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  static const String baseUrl = 'http://54.253.211.96:8000';
+
   late final int _totalSeconds;
   late int _secondsLeft;
   Timer? _timer;
 
-  int _index = 0;                       // 현재 문제 인덱스
-  final Map<int, int> _answers = {};    // {문제idx: 선택지idx}
-  bool _submitted = false;              // 제출 여부
+  List<QuizQuestion> _questions = [];
+  int _index = 0;
+  final Map<int, int> _answers = {};
+  bool _submitted = false;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _questions = widget.questions ?? _sampleQuestions();
     _totalSeconds = widget.timeMinutes * 60;
     _secondsLeft = _totalSeconds;
-    _startTimer();
+    _loadQuiz();
   }
 
   @override
@@ -47,6 +69,141 @@ class _QuizStartPageState extends State<QuizStartPage> {
     super.dispose();
   }
 
+  Future<void> _loadQuiz() async {
+    final token = await _storage.read(key: 'accessToken');
+    if (token == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 필요합니다.')),
+        );
+        await Future.delayed(const Duration(seconds: 1));
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+      return;
+    }
+
+    try {
+      final uri = Uri.parse('$baseUrl/api/quiz/generate');
+      final body = jsonEncode({
+        'category': widget.category,
+        'topic': widget.topic,
+        'n_questions': widget.nQuestions,
+      });
+
+      final res = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+        },
+        body: body,
+      );
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+
+        List<dynamic> list;
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          if (decoded['questions'] is List) {
+            list = decoded['questions'] as List;
+          } else if (decoded['data'] is List) {
+            list = decoded['data'] as List;
+          } else {
+            throw Exception('퀴즈 응답 형식을 인식할 수 없습니다.');
+          }
+        } else {
+          throw Exception('알 수 없는 응답 타입입니다.');
+        }
+
+        int letterToIndex(String letter) {
+          switch (letter.trim().toUpperCase()) {
+            case 'A': return 0;
+            case 'B': return 1;
+            case 'C': return 2;
+            case 'D': return 3;
+            default:  return 0;
+          }
+        }
+
+        final parsed = list.map((q) {
+          final choices = (q['choices'] as Map).cast<String, dynamic>();
+          final options = <String>[
+            choices['A']?.toString() ?? '',
+            choices['B']?.toString() ?? '',
+            choices['C']?.toString() ?? '',
+            choices['D']?.toString() ?? '',
+          ];
+          final correctIdx = letterToIndex(q['correct_answer']?.toString() ?? 'A');
+
+          return QuizQuestion(
+            question: q['question_text']?.toString() ?? '',
+            options: options,
+            correctIndex: correctIdx,
+            explanation: q['explanation']?.toString() ?? '',
+          );
+        }).toList();
+
+        if (!mounted) return;
+        setState(() {
+          _questions = parsed;
+          _loading = false;
+        });
+        _startTimer();
+      } else if (res.statusCode == 401) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('세션이 만료되었습니다. 다시 로그인해주세요.')),
+          );
+          await Future.delayed(const Duration(seconds: 1));
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('퀴즈 불러오기 실패: ${res.statusCode}')),
+          );
+          setState(() => _loading = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('퀴즈 불러오기 오류: $e')),
+        );
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  /// 포인트 적립: 전부 정답일 때만 호출
+  Future<String?> _addQuizPoint() async {
+    try {
+      final token = await _storage.read(key: 'accessToken');
+      if (token == null) return null;
+
+      final res = await http.patch(
+        Uri.parse('$baseUrl/api/user/add-quiz-point'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'accept': 'application/json',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        // 서버가 문자열 반환 → 그대로 안내 + 고정포인트 문구
+        return '전부 정답! +${kFixedPoint}P 적립';
+      } else {
+        return '포인트 적립 실패(${res.statusCode})';
+      }
+    } catch (e) {
+      return '포인트 적립 오류: $e';
+    }
+  }
+
+  // 타이머
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -62,14 +219,14 @@ class _QuizStartPageState extends State<QuizStartPage> {
   void _autoSubmit() {
     if (_submitted) return;
     setState(() => _submitted = true);
-    _showResultSheet();
+    _showResultDialog();
   }
 
   void _submitManually() {
     if (_submitted) return;
     _timer?.cancel();
     setState(() => _submitted = true);
-    _showResultSheet();
+    _showResultDialog();
   }
 
   int _score() {
@@ -87,59 +244,62 @@ class _QuizStartPageState extends State<QuizStartPage> {
     return '$m:$s';
   }
 
-  void _showResultSheet() {
+  /// ✅ 화면 중간에 뜨는 결과 다이얼로그
+  Future<void> _showResultDialog() async {
     final score = _score();
-    showModalBottomSheet(
+    final isPerfect = score == _questions.length;
+
+    String? pointMsg;
+    if (isPerfect) {
+      pointMsg = await _addQuizPoint();
+    }
+
+    if (!mounted) return;
+
+    await showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 16,
-          bottom: 16 + MediaQuery.of(context).padding.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(999),
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('결과', textAlign: TextAlign.center),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$score / ${_questions.length} 점',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              if (isPerfect)
+                Text(pointMsg ?? '전부 정답! +${kFixedPoint}P 적립',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.w700))
+              else
+                const Text(
+                  '모든 문제를 맞혀야 포인트를 받을 수 있어요.',
+                  textAlign: TextAlign.center,
+                ),
+              const SizedBox(height: 8),
+              const Text(
+                '제출 후 각 문항 아래에 해설이 표시됩니다.',
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 14),
-            Text('결과', style: TextStyle(fontSize: 16, color: Colors.grey.shade700)),
-            const SizedBox(height: 4),
-            Text(
-              '$score / ${_questions.length} 점',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '제출 후 문제 해설을 확인할 수 있어요.',
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 18),
+            ],
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          actions: [
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      Navigator.pop(context);
+                      Navigator.of(ctx).pop();
                       Navigator.pop(context, {'score': score});
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.blue,
                       side: const BorderSide(color: Colors.blue),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: const Text('나가기'),
                   ),
@@ -148,35 +308,23 @@ class _QuizStartPageState extends State<QuizStartPage> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pop(context);
-                      // 리뷰 모드: 제출 후 해설/정답 표시 (현재 화면 그대로, _submitted=true 상태)
-                      setState(() {});
+                      Navigator.of(ctx).pop();
+                      _restart();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text('해설 보기'),
+                    child: const Text('다시 풀기'),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _restart();
-                },
-                child: const Text('다시 풀기'),
-              ),
-            ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -192,9 +340,18 @@ class _QuizStartPageState extends State<QuizStartPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_questions.isEmpty) {
+      return const Scaffold(
+        body: Center(child: Text('퀴즈 문제를 불러오지 못했습니다.')),
+      );
+    }
+
     final q = _questions[_index];
     final picked = _answers[_index];
-
     final progress = (_index + 1) / _questions.length;
 
     return Scaffold(
@@ -246,12 +403,9 @@ class _QuizStartPageState extends State<QuizStartPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 번호 / 총문항
               Text('문제 ${_index + 1} / ${_questions.length}',
                   style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w700)),
               const SizedBox(height: 10),
-
-              // 문제 카드
               Expanded(
                 child: SingleChildScrollView(
                   child: Container(
@@ -259,31 +413,23 @@ class _QuizStartPageState extends State<QuizStartPage> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 6)),
-                      ],
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 6))],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(q.question,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                        Text(q.question, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 14),
-
-                        // 선택지
                         for (int i = 0; i < q.options.length; i++)
                           _OptionTile(
                             index: i,
                             text: q.options[i],
                             selected: picked == i,
-                            onTap: _submitted
-                                ? null
-                                : () => setState(() => _answers[_index] = i),
+                            onTap: _submitted ? null : () => setState(() => _answers[_index] = i),
                             reviewMode: _submitted,
                             correct: q.correctIndex == i,
                             chosenWrong: _submitted && picked == i && picked != q.correctIndex,
                           ),
-
                         if (_submitted) ...[
                           const SizedBox(height: 16),
                           Container(
@@ -297,12 +443,7 @@ class _QuizStartPageState extends State<QuizStartPage> {
                               children: [
                                 const Icon(Icons.info_outline, color: Colors.blue),
                                 const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    q.explanation,
-                                    style: const TextStyle(height: 1.35),
-                                  ),
-                                ),
+                                Expanded(child: Text(q.explanation, style: const TextStyle(height: 1.35))),
                               ],
                             ),
                           ),
@@ -312,10 +453,7 @@ class _QuizStartPageState extends State<QuizStartPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 12),
-
-              // 하단 버튼 영역
               Row(
                 children: [
                   Expanded(
@@ -335,19 +473,13 @@ class _QuizStartPageState extends State<QuizStartPage> {
                     child: ElevatedButton(
                       onPressed: () {
                         if (_submitted) {
-                          // 리뷰 모드에서는 다음/완료 동작만
-                          if (_index < _questions.length - 1) {
-                            setState(() => _index++);
-                          } else {
-                            Navigator.pop(context, {'score': _score()});
-                          }
+                          if (_index < _questions.length - 1) setState(() => _index++);
+                          else Navigator.pop(context, {'score': _score()});
                           return;
                         }
-
                         if (_index < _questions.length - 1) {
                           setState(() => _index++);
                         } else {
-                          // 마지막 문제 -> 제출
                           _submitManually();
                         }
                       },
@@ -370,56 +502,16 @@ class _QuizStartPageState extends State<QuizStartPage> {
       ),
     );
   }
-
-  /// 샘플 문제
-  List<QuizQuestion> _sampleQuestions() => [
-    QuizQuestion(
-      question: '지진이 발생했을 때 실내에서 가장 먼저 해야 할 행동은?',
-      options: ['창문을 연다', '가스 밸브를 잠그고 책상 밑으로 몸을 숨긴다', '엘리베이터로 대피한다', '밖으로 뛰쳐나간다'],
-      correctIndex: 1,
-      explanation: '실내에서는 떨어지는 물건에 대비해 책상/침대 아래에 몸을 숨기고, 화재 예방을 위해 가스 밸브를 잠그는 것이 우선입니다.',
-    ),
-    QuizQuestion(
-      question: '화재 발생 시 올바른 대피 방법은?',
-      options: ['젖은 수건으로 입과 코를 막고 낮은 자세로 이동한다', '엘리베이터를 이용한다', '연기가 많으면 창고에 숨는다', '창문을 깨고 점프한다'],
-      correctIndex: 0,
-      explanation: '연기는 위로 이동하므로 낮은 자세가 안전하며, 엘리베이터는 정전/질식 위험이 있어 금지입니다.',
-    ),
-    QuizQuestion(
-      question: '태풍 예보 시 사전에 준비해야 할 사항으로 옳지 않은 것은?',
-      options: ['창문을 테이프로 고정한다', '야외 물건을 실내로 옮긴다', '하천 주변으로 구경을 나간다', '비상 식수/라디오를 준비한다'],
-      correctIndex: 2,
-      explanation: '하천/해안 접근은 매우 위험합니다. 외부 물건 정리와 비상물자 준비가 중요합니다.',
-    ),
-  ];
 }
 
-/// ===== 모델 =====
-class QuizQuestion {
-  final String question;
-  final List<String> options;
-  final int correctIndex;
-  final String explanation;
-
-  QuizQuestion({
-    required this.question,
-    required this.options,
-    required this.correctIndex,
-    required this.explanation,
-  });
-}
-
-/// ===== 옵션 타일 위젯 =====
 class _OptionTile extends StatelessWidget {
   final int index;
   final String text;
   final bool selected;
   final VoidCallback? onTap;
-
-  /// 리뷰 모드(제출 후)일 때 색상 처리
   final bool reviewMode;
-  final bool correct;     // 이 선택지가 정답인지
-  final bool chosenWrong; // 사용자가 선택했고 오답인지
+  final bool correct;
+  final bool chosenWrong;
 
   const _OptionTile({
     required this.index,
@@ -469,20 +561,21 @@ class _OptionTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 28, height: 28,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: reviewMode ? border : (selected ? Colors.blue : Colors.grey.shade400)),
+                border: Border.all(
+                  color: reviewMode ? border : (selected ? Colors.blue : Colors.grey.shade400),
+                ),
                 color: reviewMode
-                    ? (correct
-                    ? Colors.green
-                    : (chosenWrong ? Colors.red : Colors.white))
+                    ? (correct ? Colors.green : (chosenWrong ? Colors.red : Colors.white))
                     : (selected ? Colors.blue : Colors.white),
               ),
               child: reviewMode
-                  ? (icon != null ? Icon(icon, size: 18, color: Colors.white) : Text(_alpha(index),
+                  ? (icon != null
+                  ? Icon(icon, size: 18, color: Colors.white)
+                  : Text(_alpha(index),
                   style: TextStyle(
                     color: (correct || chosenWrong) ? Colors.white : Colors.black54,
                     fontWeight: FontWeight.w700,
@@ -499,10 +592,7 @@ class _OptionTile extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                text,
-                style: TextStyle(fontSize: 16, color: txt),
-              ),
+              child: Text(text, style: TextStyle(fontSize: 16, color: txt)),
             ),
           ],
         ),

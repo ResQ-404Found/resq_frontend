@@ -34,6 +34,10 @@ import 'pages/counseling_center_page.dart';
 import 'pages/chatbot_page.dart';
 import 'pages/counseling_chatbot_page.dart';
 import 'pages/user/role_gate.dart';
+import 'pages/quiz.dart';
+import 'pages/quiz_details.dart';
+
+
 /// Central place for route names
 class AppRoutes {
   static const root = '/';
@@ -71,6 +75,10 @@ class AppRoutes {
   static const counselingCenter = '/counseling-center';
   static const chatDisaster = '/chat-disaster';
   static const chatPsych = '/chat-psych';
+
+  static const quiz = '/quiz';
+  static const quizDetail = '/quiz/detail';
+
   // password reset
   static const pwReq = '/password_reset_request';
   static const pwVerify = '/password_reset_verify';
@@ -123,6 +131,20 @@ class AppRouter {
 
       case AppRoutes.withdrawl:
         return _page(WithdrawalConfirmationPage());
+
+      case AppRoutes.quiz:
+        return _page(const QuizListPage());
+
+      case AppRoutes.quizDetail: {
+        final map = (args is Map<String, dynamic>) ? args : const <String, dynamic>{};
+        return _page(QuizDetailsPage(
+          title:       (map['title'] as String?) ?? '퀴즈',
+          timeMinutes: (map['timeMinutes'] as int?) ?? 5,
+          category:    (map['category'] as String?) ?? '지진',
+          topic:       (map['topic'] as String?) ?? '지진 발생 시 행동요령',
+          nQuestions:  (map['nQuestions'] as int?) ?? 5,
+        ));
+      }
 
       case AppRoutes.disastermenu:
         return _page(DisasterMenuPage());
