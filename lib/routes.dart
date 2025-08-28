@@ -31,7 +31,6 @@ import 'pages/disaster_detail_page.dart';
 import 'pages/quiz.dart';
 import 'pages/quiz_details.dart';
 
-
 /// Central place for route names
 class AppRoutes {
   static const root = '/';

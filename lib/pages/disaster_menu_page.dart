@@ -6,7 +6,8 @@ import 'app_bottom_nav.dart';
 import 'friend_page.dart';
 import 'donation_list_page.dart';
 import 'news_page.dart';
-
+import 'quiz.dart';
+import 'quiz_details.dart';
 class DisasterMenuPage extends StatelessWidget {
   const DisasterMenuPage({super.key});
 
