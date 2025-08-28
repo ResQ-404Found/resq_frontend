@@ -28,7 +28,7 @@ import 'pages/news_page.dart';
 import 'pages/my_post_detail_page.dart';
 import 'pages/all_disaster_type_detail_page.dart';
 import 'pages/disaster_detail_page.dart';
-
+import 'pages/shelter_admin_center_page.dart';
 
 /// Central place for route names
 class AppRoutes {
@@ -63,7 +63,7 @@ class AppRoutes {
   static const allPostDetail = '/allpostdetail';
   static const allDisasters = '/all-disasters';
   static const disasterDetail = '/disasterDetail';
-
+  static const shelterAdmin = '/shelter-admin';
 
   // password reset
   static const pwReq = '/password_reset_request';
@@ -81,6 +81,8 @@ class AppRouter {
       case AppRoutes.root:
       case AppRoutes.initial:
         return _page(const InitialPage());
+      case AppRoutes.shelterAdmin:
+        return _page(const ShelterAdminCenterPage());
 
       case AppRoutes.login:
         return _page(LoginPage());
