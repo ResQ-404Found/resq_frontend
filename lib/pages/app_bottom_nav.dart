@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:resq_frontend/pages/counseling_center_page.dart';
 
 import 'map_page.dart';
-import 'chatbot_page.dart';
+import 'counseling_center_page.dart';
 import 'community_page.dart';
 import 'disaster_menu_page.dart';
 import 'user_page.dart';
@@ -39,7 +40,7 @@ class AppBottomNav extends StatelessWidget {
   static void _go(BuildContext context, int index) {
     final Widget page = switch (index) {
       0 => const MapPage(),
-      1 => const ChatbotPage(),
+      1 => const CounselingCenterPage(),
       2 => const CommunityMainPage(),
       3 => const DisasterMenuPage(),
       4 => const UserProfilePage(),

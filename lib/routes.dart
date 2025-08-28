@@ -28,6 +28,12 @@ import 'pages/news_page.dart';
 import 'pages/my_post_detail_page.dart';
 import 'pages/all_disaster_type_detail_page.dart';
 import 'pages/disaster_detail_page.dart';
+import 'pages/shelter_admin_center_page.dart';
+import 'pages/counseling_center_page.dart';
+import 'pages/counseling_center_page.dart';
+import 'pages/chatbot_page.dart';
+import 'pages/counseling_chatbot_page.dart';
+import 'pages/user/role_gate.dart';
 import 'pages/quiz.dart';
 import 'pages/quiz_details.dart';
 
@@ -64,6 +70,10 @@ class AppRoutes {
   static const allPostDetail = '/allpostdetail';
   static const allDisasters = '/all-disasters';
   static const disasterDetail = '/disasterDetail';
+  static const shelterAdmin = '/shelter-admin';
+  static const counselingCenter = '/counseling-center';
+  static const chatDisaster = '/chat-disaster';
+  static const chatPsych = '/chat-psych';
 
   static const quiz = '/quiz';
   static const quizDetail = '/quiz/detail';
@@ -72,6 +82,7 @@ class AppRoutes {
   static const pwReq = '/password_reset_request';
   static const pwVerify = '/password_reset_verify';
   static const pwNew = '/password_reset_new';
+  static const roleGate = '/role-gate';
 }
 
 /// Safer router: handles args & unknown routes
@@ -84,7 +95,15 @@ class AppRouter {
       case AppRoutes.root:
       case AppRoutes.initial:
         return _page(const InitialPage());
-
+      case AppRoutes.shelterAdmin:
+        return _page(const ShelterAdminCenterPage());
+      case AppRoutes.chatDisaster:
+      case AppRoutes.chatbot: // 기존 호환 유지
+        return _page(const ChatbotPage());
+      case AppRoutes.roleGate:
+        return _page(const RoleGate());
+      case AppRoutes.chatPsych:
+        return _page(const CounselingChatbotPage());
       case AppRoutes.login:
         return _page(LoginPage());
 
@@ -93,9 +112,6 @@ class AppRouter {
 
       case AppRoutes.map:
         return _page(MapPage());
-
-      case AppRoutes.chatbot:
-        return _page(ChatbotPage());
 
       case AppRoutes.community:
         return _page(CommunityMainPage());
