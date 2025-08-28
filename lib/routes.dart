@@ -33,7 +33,7 @@ import 'pages/counseling_center_page.dart';
 import 'pages/counseling_center_page.dart';
 import 'pages/chatbot_page.dart';
 import 'pages/counseling_chatbot_page.dart';
-
+import 'pages/user/role_gate.dart';
 /// Central place for route names
 class AppRoutes {
   static const root = '/';
@@ -75,6 +75,7 @@ class AppRoutes {
   static const pwReq = '/password_reset_request';
   static const pwVerify = '/password_reset_verify';
   static const pwNew = '/password_reset_new';
+  static const roleGate = '/role-gate';
 }
 
 /// Safer router: handles args & unknown routes
@@ -92,7 +93,8 @@ class AppRouter {
       case AppRoutes.chatDisaster:
       case AppRoutes.chatbot: // 기존 호환 유지
         return _page(const ChatbotPage());
-
+      case AppRoutes.roleGate:
+        return _page(const RoleGate());
       case AppRoutes.chatPsych:
         return _page(const CounselingChatbotPage());
       case AppRoutes.login:

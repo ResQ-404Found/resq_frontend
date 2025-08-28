@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
-import 'dart:async'; 
+import 'dart:async';
+import '../../routes.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -49,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
       final success = await _validateAccessToken(accessToken);
       if (!mounted) return;
       if (success) {
-        Navigator.pushReplacementNamed(context, '/map');
+        Navigator.pushReplacementNamed(context, AppRoutes.roleGate);
         return;
       }
     }
@@ -59,7 +60,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       if (newAccessToken != null) {
         await _secureStorage.write(key: 'accessToken', value: newAccessToken);
-        Navigator.pushReplacementNamed(context, '/map');
+        Navigator.pushReplacementNamed(context, AppRoutes.roleGate);
         return;
       }
     }
@@ -166,7 +167,7 @@ class _LoginPageState extends State<LoginPage> {
 
           _show('로그인 성공');
           if (!mounted) return;
-          Navigator.pushReplacementNamed(context, '/map');
+          Navigator.pushReplacementNamed(context, AppRoutes.roleGate);
         }
       } else if (res.statusCode == 401) {
         _show('아이디 또는 비밀번호가 틀렸습니다');
