@@ -16,7 +16,7 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final List<Map<String, String>> _messages = [];
   final ScrollController _scrollController = ScrollController();
-
+  bool _canSend = false;
   bool _loadingHistory = false;
   bool _isTyping = false;
 
@@ -24,11 +24,29 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
   static const String historyPath = '/api/chatbot/disaster/history';
   static const String chatPath = '/api/chatbot/disaster';
 
+  // 하단 추천 칩 (스샷처럼)
+  final List<String> _suggestions = const [
+    '지진 대응법',
+    '화재 대응법',
+    '침수 대응법',
+    '태풍 대비 요령',
+    '응급 처치',
+    '대피 요령',
+    '가족 연락 방법',
+    '비상 물품 목록'
+  ];
+
   @override
   void initState() {
     super.initState();
     _loadChatHistory();
+
+    _messageController.addListener(() {
+      final can = _messageController.text.trim().isNotEmpty;
+      if (can != _canSend) setState(() => _canSend = can);
+    });
   }
+
 
   Future<void> _loadChatHistory() async {
     setState(() => _loadingHistory = true);
@@ -62,7 +80,7 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
         setState(() {
           _messages.add({
             "role": "bot",
-            "message": "안녕하세요 저는 재난 전문 챗봇입니다. 무엇을 도와드릴까요?",
+            "message": "안녕하세요! 재난 대응 전문가 챗봇입니다. 궁금하신 내용이 있으면 언제든지 질문해주세요."
           });
           for (final item in ordered) {
             _messages.add({"role": "user", "message": item['user_message']});
@@ -101,8 +119,8 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
 
   Future<String?> _getAccessToken() async => _storage.read(key: 'accessToken');
 
-  Future<void> _sendMessage() async {
-    final message = _messageController.text.trim();
+  Future<void> _sendMessage([String? preset]) async {
+    final message = (preset ?? _messageController.text).trim();
     if (message.isEmpty) return;
 
     final accessToken = await _getAccessToken();
@@ -119,6 +137,7 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
       _messages.add({"role": "user", "message": message});
       _messageController.clear();
       _isTyping = true;
+      _canSend = false;
     });
     _jumpToBottom();
 
@@ -161,7 +180,7 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 120,
+          _scrollController.position.maxScrollExtent + 140,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
@@ -169,115 +188,113 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
     });
   }
 
-  PreferredSizeWidget _styledAppBar() {
+  // ─────────── 상단바: 스샷의 빨간 헤더 ───────────
+  PreferredSizeWidget _disasterAppBar() {
     return PreferredSize(
-      preferredSize: const Size.fromHeight(60),
-      child: Stack(
-        children: [
-          Container(height: 60, color: Colors.white),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+      preferredSize: const Size.fromHeight(92),
+      child: Container(
+        decoration: const BoxDecoration(color: Color(0xFFE53935)),
+        child: SafeArea(
+          bottom: false,
+          child: Container(
+            height: 92,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left, size: 35,color:Colors.white),
+                  onPressed: () => Navigator.pop(context),
                 ),
-              ],
-            ),
-            child: AppBar(
-              scrolledUnderElevation: 0,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              title: const Padding(
-                padding: EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '챗봇',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF353535),
+
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.verified_user, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        '재난 대응 상담',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                    ],
                   ),
                 ),
-              ),
-              centerTitle: true,
-              automaticallyImplyLeading: false,
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: _chipBar(isCounseling: false),
+                // 우측 스위치 칩 → 심리상담 화면으로
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CounselingChatbotPage()),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: const Text('심리 상담',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _chipBar({required bool isCounseling}) {
-    Widget chip(String label, bool selected, VoidCallback onTap) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: selected ? const Color(0xFFFFE6EA) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? Colors.pinkAccent : const Color(0xFFE6E6E6),
-              width: 1.2,
-            ),
-            boxShadow: selected
-                ? [BoxShadow(color: Colors.pinkAccent.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))]
-                : null,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: selected ? Colors.pinkAccent : const Color(0xFF7B7B7B),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        chip('채널', !isCounseling, () {
-        }),
-        const SizedBox(width: 8),
-        chip('심리상담', isCounseling, () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const CounselingChatbotPage()),
-          );
-        }),
-      ],
-    );
-  }
-
+  // ─────────── 말풍선 ───────────
   Widget _bubble({required String text, required bool isUser}) {
-    final Color userBg = const Color(0xFFE7F5EC); // 민트
-    final Color botBg = const Color(0xFFFFE6EA);  // 연핑크
-    final Color shadowColor = isUser ? const Color(0xFF5DD194) : Colors.pinkAccent;
+    final Color userBg = const Color(0xFFF1F5F9); // 밝은 회색
+    final Color botBg = Colors.white;
+    final BorderRadius userRadius = const BorderRadius.only(
+      topLeft: Radius.circular(16),
+      topRight: Radius.circular(16),
+      bottomLeft: Radius.circular(16),
+    );
+    final BorderRadius botRadius = const BorderRadius.only(
+      topLeft: Radius.circular(16),
+      topRight: Radius.circular(16),
+      bottomRight: Radius.circular(16),
+    );
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: isUser ? const EdgeInsets.fromLTRB(80, 14, 16, 6) : const EdgeInsets.fromLTRB(16, 10, 80, 6),
+        margin: isUser
+            ? const EdgeInsets.fromLTRB(80, 12, 16, 6)
+            : const EdgeInsets.fromLTRB(16, 12, 80, 6),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
           color: isUser ? userBg : botBg,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: shadowColor.withOpacity(0.16), blurRadius: 10, offset: const Offset(0, 4))],
+          borderRadius: isUser ? userRadius : botRadius,
+          border: Border.all(color: const Color(0xFFE6E6E6)),
         ),
-        child: Text(text, style: const TextStyle(fontSize: 15.0, height: 1.35)),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 15.0, height: 1.35, color: Color(0xFF333333)),
+        ),
       ),
     );
   }
@@ -290,21 +307,14 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
         Row(
           children: [
             const SizedBox(width: 16),
-            Container(
-              decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [
-                BoxShadow(color: const Color(0xFF5E5E5E).withOpacity(0.35), blurRadius: 3, offset: const Offset(0, 0)),
-              ]),
-              child: const CircleAvatar(
-                radius: 16,
-                backgroundImage: AssetImage('lib/asset/chatbot_profile.png'),
-                backgroundColor: Colors.white,
-              ),
+            const CircleAvatar(
+              radius: 16,
+              backgroundImage: AssetImage('lib/asset/chatbot_profile.png'),
+              backgroundColor: Colors.white,
             ),
-            const SizedBox(width: 12),
-            const Text(
-              '재난 전문 챗봇',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF454545)),
-            ),
+            const SizedBox(width: 8),
+            const Text('재난 전문 챗봇',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF555555))),
           ],
         ),
         _bubble(text: text, isUser: false),
@@ -313,39 +323,106 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
   }
 
   Widget _typingBubble() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            const SizedBox(width: 16),
-            Container(
-              decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [
-                BoxShadow(color: const Color(0xFF5E5E5E).withOpacity(0.35), blurRadius: 3, offset: const Offset(0, 0)),
-              ]),
-              child: const CircleAvatar(
-                radius: 16,
-                backgroundImage: AssetImage('lib/asset/chatbot_profile.png'),
-                backgroundColor: Colors.white,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 10, 80, 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+          ),
+          border: Border.all(color: const Color(0xFFE6E6E6)),
+        ),
+        child: const _AnimatedDots(),
+      ),
+    );
+  }
+
+  // ─────────── 하단 입력 + 추천칩 ───────────
+  Widget _suggestionBar() {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.only(left: 12),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _suggestions.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final label = _suggestions[i];
+          return InkWell(
+            onTap: () => _sendMessage(label),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 5,),
+              decoration: BoxDecoration(
+                color: Colors.white, // ← 안 흰색
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE53935)), // ← 빨강 테두리
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFFE53935), // ← 글자 빨강
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ],
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 10, 80, 6),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFE6EA),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.pinkAccent.withOpacity(0.16), blurRadius: 10, offset: const Offset(0, 4))],
+          );
+        },
+      ),
+    );
+  }
+
+
+  Widget _inputBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: const Color(0xFFE6E6E6)),
+              ),
+              child: TextField(
+                controller: _messageController,
+                decoration: const InputDecoration(
+                  hintText: '메시지를 입력하세요...',
+                  hintStyle: TextStyle(color: Colors.grey, fontSize: 15),
+                  contentPadding: EdgeInsets.only(left: 6, bottom: 12, top: 12),
+                  border: InputBorder.none,
+                ),
+                onSubmitted: (_) => _sendMessage(),
+              ),
             ),
-            child: const _AnimatedDots(),
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Container(
+            height: 48,
+            width: 48,
+            decoration: BoxDecoration(
+              color: _canSend ? const Color(0xFFE53935) : Colors.grey[400], // 빈칸=회색, 입력 있음=빨강
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.send, color: Colors.white),
+              onPressed: _canSend ? _sendMessage : null, // 빈칸이면 비활성화
+              tooltip: '전송',
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -354,7 +431,7 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
     if (_loadingHistory) {
       return Scaffold(
         backgroundColor: Colors.white,
-        appBar: _styledAppBar(),
+        appBar: _disasterAppBar(),
         body: const Center(child: CircularProgressIndicator()),
         bottomNavigationBar: const AppBottomNav(currentIndex: 1),
       );
@@ -362,7 +439,7 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: _styledAppBar(),
+      appBar: _disasterAppBar(),
       body: Column(
         children: [
           Expanded(
@@ -376,44 +453,14 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
                 }
                 final msg = _messages[index];
                 final isUser = msg['role'] == 'user';
-                return isUser ? _bubble(text: msg['message'] ?? '', isUser: true) : _botMessage(msg['message'] ?? '');
+                return isUser
+                    ? _bubble(text: msg['message'] ?? '', isUser: true)
+                    : _botMessage(msg['message'] ?? '');
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFE6E6E6)),
-                    ),
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: const InputDecoration(
-                        hintText: '메시지를 입력하세요',
-                        hintStyle: TextStyle(color: Colors.grey, fontSize: 15),
-                        contentPadding: EdgeInsets.only(left: 8),
-                        border: InputBorder.none,
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  height: 48,
-                  width: 48,
-                  decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
-                  child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: _sendMessage),
-                ),
-              ],
-            ),
-          ),
+          _suggestionBar(),
+          _inputBar(),
         ],
       ),
       bottomNavigationBar: const AppBottomNav(currentIndex: 1),

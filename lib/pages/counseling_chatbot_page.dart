@@ -19,15 +19,41 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
 
   bool _loadingHistory = false;
   bool _isTyping = false;
+  bool _canSend = false; // ← 입력 여부에 따른 전송 버튼 상태
 
   static const String baseUrl = 'http://54.253.211.96:8000';
   static const String historyPath = '/api/chatbot/counseling/history';
   static const String chatPath = '/api/chatbot/counseling';
 
+  final List<String> _suggestions = const [
+    '불안 진정 호흡법',
+    '수면 개선 팁',
+    '트라우마 대처',
+    '스트레스 해소법',
+    '위기 대응 연락처',
+    '감정 기록 방법',
+    '자기 위로 문장',
+    '마음챙김 가이드',
+  ];
+
   @override
   void initState() {
     super.initState();
     _loadChatHistory();
+    // 입력 변화 감지 → 버튼 활성/비활성 토글
+    _messageController.addListener(() {
+      final can = _messageController.text.trim().isNotEmpty;
+      if (can != _canSend) {
+        setState(() => _canSend = can);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadChatHistory() async {
@@ -101,8 +127,8 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
 
   Future<String?> _getAccessToken() async => _storage.read(key: 'accessToken');
 
-  Future<void> _sendMessage() async {
-    final message = _messageController.text.trim();
+  Future<void> _sendMessage([String? preset]) async {
+    final message = (preset ?? _messageController.text).trim(); // ← 추가
     if (message.isEmpty) return;
 
     final accessToken = await _getAccessToken();
@@ -119,6 +145,7 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
       _messages.add({"role": "user", "message": message});
       _messageController.clear();
       _isTyping = true;
+      _canSend = false; // 입력창 비우면 버튼 회색/비활성
     });
     _jumpToBottom();
 
@@ -157,6 +184,7 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
     _jumpToBottom();
   }
 
+
   void _jumpToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -169,115 +197,153 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
     });
   }
 
+  // 파란 헤더(심리)
   PreferredSizeWidget _styledAppBar() {
     return PreferredSize(
-      preferredSize: const Size.fromHeight(60),
-      child: Stack(
-        children: [
-          Container(height: 60, color: Colors.white),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+      preferredSize: const Size.fromHeight(92),
+      child: Container(
+        decoration: const BoxDecoration(color: Color(0xFF1E88E5)),
+        child: SafeArea(
+          bottom: false,
+          child: Container(
+            height: 92,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left, size: 35,color:Colors.white),
+                  onPressed: () => Navigator.pop(context),
                 ),
-              ],
-            ),
-            child: AppBar(
-              scrolledUnderElevation: 0,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              title: const Padding(
-                padding: EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '챗봇',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF353535),
+
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.favorite_outline, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '심리 지원 상담',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                    ],
                   ),
                 ),
-              ),
-              centerTitle: true,
-              automaticallyImplyLeading: false,
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: _chipBar(isCounseling: true),
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ChatbotPage()),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: const Text(
+                      '재난 상담',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+  Widget _suggestionBar() {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.only(left: 12),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _suggestions.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final label = _suggestions[i];
+          return InkWell(
+            onTap: () => _sendMessage(label),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 5,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white, // ← 안 흰색
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF1E87E3)),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF1E87E3),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _chipBar({required bool isCounseling}) {
-    Widget chip(String label, bool selected, VoidCallback onTap) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: selected ? const Color(0xFFFFE6EA) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? Colors.pinkAccent : const Color(0xFFE6E6E6),
-              width: 1.2,
-            ),
-            boxShadow: selected
-                ? [BoxShadow(color: Colors.pinkAccent.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))]
-                : null,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: selected ? Colors.pinkAccent : const Color(0xFF7B7B7B),
-            ),
-          ),
-        ),
-      );
-    }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        chip('재난', !isCounseling, () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const ChatbotPage()),
-          );
-        }),
-        const SizedBox(width: 8),
-        chip('심리상담', isCounseling, () {
-        }),
-      ],
-    );
-  }
-
+  // 말풍선(재난과 동일 스타일)
   Widget _bubble({required String text, required bool isUser}) {
-    final Color userBg = const Color(0xFFE7F5EC); // 민트
-    final Color botBg = const Color(0xFFFFE6EA);  // 연핑크
-    final Color shadowColor = isUser ? const Color(0xFF5DD194) : Colors.pinkAccent;
+    final Color userBg = const Color(0xFFF1F5F9); // 밝은 회색
+    final Color botBg = Colors.white;
+
+    final BorderRadius userRadius = const BorderRadius.only(
+      topLeft: Radius.circular(16),
+      topRight: Radius.circular(16),
+      bottomLeft: Radius.circular(16),
+    );
+    final BorderRadius botRadius = const BorderRadius.only(
+      topLeft: Radius.circular(16),
+      topRight: Radius.circular(16),
+      bottomRight: Radius.circular(16),
+    );
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: isUser ? const EdgeInsets.fromLTRB(80, 14, 16, 6) : const EdgeInsets.fromLTRB(16, 10, 80, 6),
+        margin: isUser
+            ? const EdgeInsets.fromLTRB(80, 12, 16, 6)
+            : const EdgeInsets.fromLTRB(16, 12, 80, 6),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
           color: isUser ? userBg : botBg,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: shadowColor.withOpacity(0.16), blurRadius: 10, offset: const Offset(0, 4))],
+          borderRadius: isUser ? userRadius : botRadius,
+          border: Border.all(color: const Color(0xFFE6E6E6)),
         ),
-        child: Text(text, style: const TextStyle(fontSize: 15.0, height: 1.35)),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 15.0, height: 1.35, color: Color(0xFF333333)),
+        ),
       ),
     );
   }
@@ -290,21 +356,17 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
         Row(
           children: [
             const SizedBox(width: 16),
-            Container(
-              decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [
-                BoxShadow(color: const Color(0xFF5E5E5E).withOpacity(0.35), blurRadius: 3, offset: const Offset(0, 0)),
-              ]),
-              child: const CircleAvatar(
-                radius: 16,
-                backgroundImage: AssetImage('lib/asset/chatbot_profile.png'),
-                backgroundColor: Colors.white,
-              ),
+            const CircleAvatar(
+              radius: 16,
+              backgroundImage: AssetImage('lib/asset/chatbot_profile.png'),
+              backgroundColor: Colors.white,
             ),
-            const SizedBox(width: 12),
-            const Text(
-              '심리상담 챗봇',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF454545)),
-            ),
+            const SizedBox(width: 8),
+            const Text('심리상담 챗봇',
+                style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF555555))),
           ],
         ),
         _bubble(text: text, isUser: false),
@@ -312,40 +374,24 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
     );
   }
 
+  // 타이핑 버블(재난 스타일: 화이트 + 테두리)
   Widget _typingBubble() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            const SizedBox(width: 16),
-            Container(
-              decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [
-                BoxShadow(color: const Color(0xFF5E5E5E).withOpacity(0.35), blurRadius: 3, offset: const Offset(0, 0)),
-              ]),
-              child: const CircleAvatar(
-                radius: 16,
-                backgroundImage: AssetImage('lib/asset/chatbot_profile.png'),
-                backgroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 10, 80, 6),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFE6EA),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.pinkAccent.withOpacity(0.16), blurRadius: 10, offset: const Offset(0, 4))],
-            ),
-            child: const _AnimatedDots(),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 10, 80, 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomRight: Radius.circular(16),
           ),
+          border: Border.all(color: const Color(0xFFE6E6E6)),
         ),
-      ],
+        child: const _AnimatedDots(),
+      ),
     );
   }
 
@@ -377,7 +423,7 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
                 return isUser ? _bubble(text: msg['message'] ?? '', isUser: true) : _botMessage(msg['message'] ?? '');
               },
             ),
-          ),
+          ),_suggestionBar(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             child: Row(
@@ -398,7 +444,7 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
                         contentPadding: EdgeInsets.only(left: 8),
                         border: InputBorder.none,
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      onSubmitted: (_) => _canSend ? _sendMessage() : null,
                     ),
                   ),
                 ),
@@ -406,8 +452,15 @@ class _CounselingChatbotPageState extends State<CounselingChatbotPage> with Sing
                 Container(
                   height: 48,
                   width: 48,
-                  decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
-                  child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: _sendMessage),
+                  decoration: BoxDecoration(
+                    color: _canSend ? const Color(0xFF1E88E5) : Colors.grey[400], // 파랑 활성 / 회색 비활성
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.send, color: Colors.white),
+                    onPressed: _canSend ? _sendMessage : null,
+                    tooltip: '전송',
+                  ),
                 ),
               ],
             ),
