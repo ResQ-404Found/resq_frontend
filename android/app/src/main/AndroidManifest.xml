@@ -8,7 +8,8 @@
         android:label="resq_frontend"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-
+        android:theme="@style/AppTheme">
+        android:enableOnBackInvokedCallback="true"
         <!-- Firebase 알림 채널 설정 -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
@@ -19,7 +20,7 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
-            android:theme="@style/LaunchTheme"
+            android:theme="@style/NormalTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">

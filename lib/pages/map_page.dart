@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app_bottom_nav.dart';
+// 라우트 상수 사용
+import 'package:resq_frontend/routes.dart';
 
 const String kakaoRestApiKey = 'KakaoAK 6c70d9ab4ca17bdfa047539c7d8ec0a8';
 
@@ -97,33 +99,86 @@ class MapPage extends StatefulWidget {
   State<MapPage> createState() => _MapPageState();
 }
 
-class _MapPageState extends State<MapPage> {
+class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
+  // 컨트롤러/라이프사이클 가드
   NaverMapController? _controller;
-  String? _currentAddress;
+  bool _alive = true;
 
+  // 맵은 1회 생성·재사용
+  late final Widget _mapView;
+
+  // 주소/행정동
+  String? _currentAddress;
+  String? _sido, _sigungu, _eupmyeondong;
+
+  // 마커들
   final List<NMarker> _shelterMarkers = [];
   final List<NMarker> _hospitalMarkers = [];
+  NMarker? _userMarker;
 
+  // 선택 상태
   Shelter? _selectedShelter;
   Hospital? _selectedHospital;
 
+  // 재난
   List<Disaster> _disasterList = [];
   bool _showDisasterSheet = false;
   bool _hasDisasterMessage = false;
 
-  String? _sido, _sigungu, _eupmyeondong;
-  String _selectedMenu = ''; // '', 'shelter', 'hospital', 'disaster'
+  // 모드
+  String _selectedMenu = ''; // '', 'shelter', 'hospital'
 
-  NMarker? _userMarker;
+  // 위치/로딩
   Position? _currentPosition;
-
   bool _loadingShelters = false;
   bool _loadingHospitals = false;
   bool _loadingDisasters = false;
 
+  // 네비게이션 디바운스
+  bool _navigating = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
+
+    // 맵 인스턴스 고정 생성(고정 Key)
+    _mapView = NaverMap(
+      key: const ValueKey('naver.map.view'),
+      options: const NaverMapViewOptions(
+        mapType: NMapType.basic,
+        locationButtonEnable: false,
+        initialCameraPosition: NCameraPosition(
+          target: NLatLng(35.2313, 129.0825),
+          zoom: 12,
+        ),
+      ),
+      onMapReady: _onMapReady,
+      onMapTapped: (point, latLng) {
+        if (!mounted) return;
+        setState(() {
+          _showDisasterSheet = false;
+          _selectedMenu = '';
+          _selectedHospital = null;
+          _selectedShelter = null;
+        });
+      },
+    );
+  }
+
+  void _onMapReady(NaverMapController controller) async {
+    _controller = controller;
+    if (!_alive || !mounted) return;
+    await _getAndMoveToCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _alive = false;
+    _controller = null;
+    super.dispose();
   }
 
   // 내 위치 마커가 항상 존재하도록 보장
@@ -137,8 +192,9 @@ class _MapPageState extends State<MapPage> {
       );
     }
   }
+
   Future<void> _clearOverlaysKeepUser() async {
-    if (_controller == null) return;
+    if (_controller == null || !_alive || !mounted) return;
     await _controller!.clearOverlays();
     _ensureUserMarker();
     if (_userMarker != null) {
@@ -147,7 +203,6 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _switchMode(String? mode) async {
-    // mode: 'shelter' | 'hospital' | null
     setState(() {
       _selectedShelter = null;
       _selectedHospital = null;
@@ -159,11 +214,11 @@ class _MapPageState extends State<MapPage> {
       return;
     }
 
-    // 켜는 쪽
-    final pos = await Geolocator.getCurrentPosition();
+    final pos = _currentPosition ?? await Geolocator.getCurrentPosition();
     if (mode == 'shelter') {
       await _fetchNearbyShelters(pos);
-    } else if (mode == 'hospital') {
+    }
+    if (mode == 'hospital') {
       await _fetchNearbyHospitals(pos);
     }
   }
@@ -181,29 +236,34 @@ class _MapPageState extends State<MapPage> {
     }
 
     final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    if (!_alive || !mounted) return;
+
     _currentPosition = position;
     final userLatLng = NLatLng(position.latitude, position.longitude);
 
-    if (_controller != null) {
-      if (_userMarker == null) {
-        _userMarker = NMarker(
-          id: 'user_location',
-          position: userLatLng,
-          icon: NOverlayImage.fromAssetImage('lib/asset/user_marker.png'),
-        );
-        _controller!.addOverlay(_userMarker!);
-      } else {
-        _userMarker!.setPosition(userLatLng);
-      }
+    if (_controller == null || !_alive || !mounted) return;
 
-      await _controller!.updateCamera(
-        NCameraUpdate.fromCameraPosition(
-          NCameraPosition(target: userLatLng, zoom: 15),
-        ),
+    if (_userMarker == null) {
+      _userMarker = NMarker(
+        id: 'user_location',
+        position: userLatLng,
+        icon: NOverlayImage.fromAssetImage('lib/asset/user_marker.png'),
       );
+      await _controller!.addOverlay(_userMarker!);
+    } else {
+      _userMarker!.setPosition(userLatLng);
     }
 
+    await _controller!.updateCamera(
+      NCameraUpdate.fromCameraPosition(
+        NCameraPosition(target: userLatLng, zoom: 15),
+      ),
+    );
+    if (!_alive || !mounted) return;
+
     await _getAddress(position);
+    if (!_alive || !mounted) return;
+
     await _fetchDisasters();
   }
 
@@ -220,6 +280,7 @@ class _MapPageState extends State<MapPage> {
         final road = documents[0]['road_address']?['address_name'] ?? '';
         final resultAddress = jibun.isNotEmpty ? jibun : road;
 
+        if (!mounted) return;
         setState(() {
           _currentAddress = resultAddress;
           _sido = documents[0]['address']?['region_1depth_name'];
@@ -231,6 +292,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _fetchNearbyShelters(Position position) async {
+    if (!mounted) return;
     setState(() => _loadingShelters = true);
     try {
       final url = Uri.parse(
@@ -251,6 +313,7 @@ class _MapPageState extends State<MapPage> {
             caption: NOverlayCaption(text: shelter.name),
           );
           marker.setOnTapListener((m) {
+            if (!mounted) return;
             setState(() {
               _selectedShelter = (_selectedShelter?.name == shelter.name) ? null : shelter;
               _showDisasterSheet = false;
@@ -259,7 +322,7 @@ class _MapPageState extends State<MapPage> {
           _shelterMarkers.add(marker);
         }
 
-        if (_controller != null) {
+        if (_controller != null && _alive && mounted) {
           await _controller!.clearOverlays();
 
           _ensureUserMarker();
@@ -268,6 +331,7 @@ class _MapPageState extends State<MapPage> {
           overlays.addAll(_shelterMarkers);
 
           await _controller!.addOverlayAll(overlays);
+          if (!_alive || !mounted) return;
           await _zoomToFitMarkersIncludingUser(_shelterMarkers);
         }
       }
@@ -277,6 +341,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _fetchNearbyHospitals(Position position) async {
+    if (!mounted) return;
     setState(() => _loadingHospitals = true);
     try {
       final url = Uri.parse(
@@ -297,6 +362,7 @@ class _MapPageState extends State<MapPage> {
             caption: NOverlayCaption(text: hospital.name),
           );
           marker.setOnTapListener((m) {
+            if (!mounted) return;
             setState(() {
               _selectedHospital = (_selectedHospital?.name == hospital.name) ? null : hospital;
             });
@@ -304,7 +370,7 @@ class _MapPageState extends State<MapPage> {
           _hospitalMarkers.add(marker);
         }
 
-        if (_controller != null) {
+        if (_controller != null && _alive && mounted) {
           await _controller!.clearOverlays();
 
           _ensureUserMarker();
@@ -313,6 +379,7 @@ class _MapPageState extends State<MapPage> {
           overlays.addAll(_hospitalMarkers);
 
           await _controller!.addOverlayAll(overlays);
+          if (!_alive || !mounted) return;
           await _zoomToFitMarkersIncludingUser(_hospitalMarkers);
         }
       }
@@ -323,6 +390,7 @@ class _MapPageState extends State<MapPage> {
 
   Future<void> _fetchDisasters() async {
     if (_sido == null || _sigungu == null || _eupmyeondong == null) return;
+    if (!mounted) return;
     setState(() => _loadingDisasters = true);
     try {
       final queryUri = Uri.parse(
@@ -335,6 +403,7 @@ class _MapPageState extends State<MapPage> {
         final total = summary.values.fold<int>(0, (sum, val) => sum + (val as int));
         final List<dynamic> data = jsonBody['data'][0]['disasters'];
 
+        if (!mounted) return;
         setState(() {
           _disasterList = data.map((e) => Disaster.fromJson(e)).toList();
           _hasDisasterMessage = total > 0;
@@ -349,7 +418,8 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _zoomToFitMarkersIncludingUser(List<NMarker> markers) async {
-    if (_controller == null || (markers.isEmpty && _userMarker == null)) return;
+    if (_controller == null || !_alive || !mounted) return;
+    if (markers.isEmpty && _userMarker == null) return;
 
     final positions = <NLatLng>[];
     if (_userMarker != null) positions.add(_userMarker!.position);
@@ -362,13 +432,13 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _zoomToFitAllMarkers() async {
-    if (_shelterMarkers.isEmpty || _controller == null) return;
+    if (_shelterMarkers.isEmpty || _controller == null || !_alive || !mounted) return;
     final bounds = _calculateBounds(_shelterMarkers.map((m) => m.position).toList());
     await _controller!.updateCamera(NCameraUpdate.fitBounds(bounds, padding: const EdgeInsets.all(80)));
   }
 
   Future<void> _zoomToFitMarkers(List<NMarker> markers) async {
-    if (markers.isEmpty || _controller == null) return;
+    if (markers.isEmpty || _controller == null || !_alive || !mounted) return;
     final bounds = _calculateBounds(markers.map((m) => m.position).toList());
     await _controller!.updateCamera(NCameraUpdate.fitBounds(bounds, padding: const EdgeInsets.all(80)));
   }
@@ -390,6 +460,7 @@ class _MapPageState extends State<MapPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: SafeArea(
@@ -405,28 +476,8 @@ class _MapPageState extends State<MapPage> {
                   borderRadius: BorderRadius.circular(16),
                   child: Stack(
                     children: [
-                      NaverMap(
-                        options: const NaverMapViewOptions(
-                          mapType: NMapType.basic,
-                          locationButtonEnable: false,
-                          initialCameraPosition: NCameraPosition(
-                            target: NLatLng(35.2313, 129.0825),
-                            zoom: 12,
-                          ),
-                        ),
-                        onMapReady: (controller) async {
-                          _controller = controller;
-                          await _getAndMoveToCurrentLocation();
-                        },
-                        onMapTapped: (point, latLng) {
-                          setState(() {
-                            _showDisasterSheet = false;
-                            _selectedMenu = '';
-                            _selectedHospital = null;
-                            _selectedShelter = null;
-                          });
-                        },
-                      ),
+                      // 맵: 고정 생성본 재사용
+                      _mapView,
 
                       // 로딩 오버레이
                       if (_loadingShelters || _loadingHospitals || _loadingDisasters)
@@ -437,7 +488,7 @@ class _MapPageState extends State<MapPage> {
                           ),
                         ),
 
-                      // 바텀시트들
+                      // 바텀시트들 (부모 AnimatedPositioned만 위치 책임)
                       AnimatedPositioned(
                         duration: const Duration(milliseconds: 360),
                         curve: Curves.easeOut,
@@ -481,28 +532,26 @@ class _MapPageState extends State<MapPage> {
                               IconButton(
                                 icon: const Icon(Icons.add, color: Colors.black),
                                 onPressed: () async {
-                                  if (_controller != null) {
-                                    final pos = await _controller!.getCameraPosition();
-                                    await _controller!.updateCamera(
-                                      NCameraUpdate.fromCameraPosition(
-                                        NCameraPosition(target: pos.target, zoom: pos.zoom + 1),
-                                      ),
-                                    );
-                                  }
+                                  if (_controller == null || !_alive || !mounted) return;
+                                  final pos = await _controller!.getCameraPosition();
+                                  await _controller!.updateCamera(
+                                    NCameraUpdate.fromCameraPosition(
+                                      NCameraPosition(target: pos.target, zoom: pos.zoom + 1),
+                                    ),
+                                  );
                                 },
                               ),
                               Container(width: 36, height: 1, color: Colors.grey[300]),
                               IconButton(
                                 icon: const Icon(Icons.remove, color: Colors.black),
                                 onPressed: () async {
-                                  if (_controller != null) {
-                                    final pos = await _controller!.getCameraPosition();
-                                    await _controller!.updateCamera(
-                                      NCameraUpdate.fromCameraPosition(
-                                        NCameraPosition(target: pos.target, zoom: pos.zoom - 1),
-                                      ),
-                                    );
-                                  }
+                                  if (_controller == null || !_alive || !mounted) return;
+                                  final pos = await _controller!.getCameraPosition();
+                                  await _controller!.updateCamera(
+                                    NCameraUpdate.fromCameraPosition(
+                                      NCameraPosition(target: pos.target, zoom: pos.zoom - 1),
+                                    ),
+                                  );
                                 },
                               ),
                             ],
@@ -575,6 +624,7 @@ class _MapPageState extends State<MapPage> {
       constraints: const BoxConstraints(minWidth: 92),
       child: GestureDetector(
         onTap: () async {
+          if (!mounted) return;
           setState(() {
             final isSame = _selectedMenu == value;
             _selectedMenu = isSame ? '' : value;
@@ -584,11 +634,11 @@ class _MapPageState extends State<MapPage> {
           });
 
           if (_selectedMenu == 'shelter') {
-            final pos = await Geolocator.getCurrentPosition();
+            final pos = _currentPosition ?? await Geolocator.getCurrentPosition();
             await _fetchNearbyShelters(pos);
           }
           if (_selectedMenu == 'hospital') {
-            final pos = await Geolocator.getCurrentPosition();
+            final pos = _currentPosition ?? await Geolocator.getCurrentPosition();
             await _fetchNearbyHospitals(pos);
           }
         },
@@ -629,23 +679,30 @@ class _MapPageState extends State<MapPage> {
       padding: const EdgeInsets.only(right: 12),
       child: GestureDetector(
         onTap: () async {
-          await _fetchDisasters();
-          setState(() {
-            _selectedMenu = '';
-            _showDisasterSheet = false;
-            _selectedHospital = null;
-            _selectedShelter = null;
-          });
+          if (_navigating) return;
+          _navigating = true;
+          try {
+            await _fetchDisasters();
+            if (!mounted) return;
+            setState(() {
+              _selectedMenu = '';
+              _showDisasterSheet = false;
+              _selectedHospital = null;
+              _selectedShelter = null;
+            });
 
-          Navigator.pushNamed(
-            context,
-            '/disasters',
-            arguments: {
-              'sido': _sido ?? '',
-              'sigungu': _sigungu ?? '',
-              'eupmyeondong': _eupmyeondong ?? '',
-            },
-          );
+            await Navigator.pushNamed(
+              context,
+              AppRoutes.allDisasters, // '/all-disasters'
+              arguments: {
+                'sido': _sido ?? '',
+                'sigungu': _sigungu ?? '',
+                'eupmyeondong': _eupmyeondong ?? '',
+              },
+            );
+          } finally {
+            if (mounted) _navigating = false;
+          }
         },
         child: const Icon(Icons.notifications_none_rounded, size: 28, color: Colors.black87),
       ),
@@ -695,55 +752,52 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  // ※ Positioned 제거 - 부모 AnimatedPositioned가 위치 결정
   Widget _buildShelterDetailSheet() {
     if (_selectedShelter == null) return const SizedBox.shrink();
     final shelter = _selectedShelter!;
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('대피소 상세 정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            if (_currentAddress != null) ...[
-              _infoRow('내 위치', _currentAddress!),
-              const SizedBox(height: 6),
-            ],
-            _infoRow('이름', shelter.name),
-            _infoRow('주소', shelter.address),
-            _infoRow('거리', '${(shelter.distance * 1000).toStringAsFixed(0)}m'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                final lat = shelter.latitude;
-                final lng = shelter.longitude;
-                final name = Uri.encodeComponent(shelter.name);
-                final url = 'nmap://route/public?dlat=$lat&dlng=$lng&dname=$name&appname=com.pan.resq';
-                if (await canLaunchUrl(Uri.parse(url))) {
-                  await launchUrl(Uri.parse(url));
-                } else {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(const SnackBar(content: Text('네이버지도 앱이 설치되어 있지 않습니다.')));
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              child: const Text('길찾기 안내', style: TextStyle(color: Colors.white)),
-            ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('대피소 상세 정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          if (_currentAddress != null) ...[
+            _infoRow('내 위치', _currentAddress!),
+            const SizedBox(height: 6),
           ],
-        ),
+          _infoRow('이름', shelter.name),
+          _infoRow('주소', shelter.address),
+          _infoRow('거리', '${(shelter.distance * 1000).toStringAsFixed(0)}m'),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () async {
+              final lat = shelter.latitude;
+              final lng = shelter.longitude;
+              final name = Uri.encodeComponent(shelter.name);
+              final url = 'nmap://route/public?dlat=$lat&dlng=$lng&dname=$name&appname=com.pan.resq';
+              if (await canLaunchUrl(Uri.parse(url))) {
+                await launchUrl(Uri.parse(url));
+              } else {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('네이버지도 앱이 설치되어 있지 않습니다.')));
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              minimumSize: const Size(double.infinity, 48),
+            ),
+            child: const Text('길찾기 안내', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
@@ -753,84 +807,79 @@ class _MapPageState extends State<MapPage> {
     for (final d in _disasterList) {
       grouped.putIfAbsent(d.type, () => []).add(d);
     }
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 340,
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.warning_amber_rounded, color: Colors.red, size: 26),
-                SizedBox(width: 6),
-                Text('재난정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListView.separated(
-                itemCount: grouped.entries.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final entry = grouped.entries.elementAt(index);
-                  final first = entry.value.first;
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/disasters',
-                        arguments: {
-                          'sido': _sido ?? '',
-                          'sigungu': _sigungu ?? '',
-                          'eupmyeondong': _eupmyeondong ?? '',
-                        },
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(entry.key, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                Text(first.startTime, style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                                const SizedBox(height: 2),
-                                Text(first.region, style: const TextStyle(fontSize: 13)),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right),
-                        ],
-                      ),
+    return Container(
+      height: 340,
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 26),
+              SizedBox(width: 6),
+              Text('재난정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.separated(
+              itemCount: grouped.entries.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final entry = grouped.entries.elementAt(index);
+                final first = entry.value.first;
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.allDisasters,
+                      arguments: {
+                        'sido': _sido ?? '',
+                        'sigungu': _sigungu ?? '',
+                        'eupmyeondong': _eupmyeondong ?? '',
+                      },
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
                     ),
-                  );
-                },
-              ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(entry.key, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text(first.startTime, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                              const SizedBox(height: 2),
+                              Text(first.region, style: const TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -838,52 +887,48 @@ class _MapPageState extends State<MapPage> {
   Widget _buildHospitalDetailSheet() {
     if (_selectedHospital == null) return const SizedBox.shrink();
     final hospital = _selectedHospital!;
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('병원 상세 정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            if (_currentAddress != null) ...[
-              _infoRow('내 위치', _currentAddress!),
-              const SizedBox(height: 6),
-            ],
-            _infoRow('이름', hospital.name),
-            _infoRow('주소', hospital.address),
-            _infoRow('거리', '${(hospital.distance * 1000).toStringAsFixed(0)}m'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                final lat = hospital.latitude;
-                final lng = hospital.longitude;
-                final name = Uri.encodeComponent(hospital.name);
-                final url = 'nmap://route/public?dlat=$lat&dlng=$lng&dname=$name&appname=com.pan.resq';
-                if (await canLaunchUrl(Uri.parse(url))) {
-                  await launchUrl(Uri.parse(url));
-                } else {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(const SnackBar(content: Text('네이버지도 앱이 설치되어 있지 않습니다.')));
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              child: const Text('길찾기 안내', style: TextStyle(color: Colors.white)),
-            ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('병원 상세 정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          if (_currentAddress != null) ...[
+            _infoRow('내 위치', _currentAddress!),
+            const SizedBox(height: 6),
           ],
-        ),
+          _infoRow('이름', hospital.name),
+          _infoRow('주소', hospital.address),
+          _infoRow('거리', '${(hospital.distance * 1000).toStringAsFixed(0)}m'),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () async {
+              final lat = hospital.latitude;
+              final lng = hospital.longitude;
+              final name = Uri.encodeComponent(hospital.name);
+              final url = 'nmap://route/public?dlat=$lat&dlng=$lng&dname=$name&appname=com.pan.resq';
+              if (await canLaunchUrl(Uri.parse(url))) {
+                await launchUrl(Uri.parse(url));
+              } else {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('네이버지도 앱이 설치되어 있지 않습니다.')));
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              minimumSize: const Size(double.infinity, 48),
+            ),
+            child: const Text('길찾기 안내', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
