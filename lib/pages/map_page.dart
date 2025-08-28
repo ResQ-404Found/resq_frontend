@@ -5,7 +5,8 @@ import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:home_widget/home_widget.dart';
+import '../main.dart'; // updateDisasterWidget 가져오기
 import 'app_bottom_nav.dart';
 // 라우트 상수 사용
 import 'package:resq_frontend/routes.dart';
@@ -411,6 +412,8 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
             _showDisasterSheet = true;
           }
         });
+        updateDisasterWidget(_hasDisasterMessage);
+
       }
     } finally {
       if (mounted) setState(() => _loadingDisasters = false);

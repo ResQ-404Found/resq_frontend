@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@drawable/widget_bg"
+    android:gravity="center">
+
+    <TextView
+        android:id="@+id/disaster_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="재난 문자가 없습니다."
+        android:textSize="16sp"
+        android:textColor="@android:color/white"
+        android:textStyle="bold"
+        android:padding="8dp"
+        android:background="@drawable/widget_badge" />
+
+    <Button
+        android:id="@+id/btn_open_app"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="앱에서 확인"
+        android:background="@drawable/widget_button"
+        android:textColor="@android:color/white"
+        android:layout_marginTop="8dp"/>
+</LinearLayout>

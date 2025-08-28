@@ -1,0 +1,20 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/disaster_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/disaster_status_text"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:gravity="center"
+        android:text="재난 문자가 없습니다"
+        android:textColor="@android:color/white"
+        android:textSize="18sp"
+        android:background="@drawable/disaster_widget_bg"
+        android:ellipsize="end"
+        android:singleLine="true"/>
+</LinearLayout>
