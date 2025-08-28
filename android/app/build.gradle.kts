@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")  // kotlin-android 대신 이걸 쓰는게 맞음
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
@@ -12,10 +12,10 @@ android {
 
     defaultConfig {
         applicationId = "com.example.resq_frontend"
-        minSdk = 23   // ✅ 여기 21 → 23으로 수정
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        minSdk = flutter.minSdkVersion   // ✅ 수정
+        targetSdk = flutter.targetSdkVersion   // Flutter SDK 값 그대로 사용
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     compileOptions {
@@ -40,7 +40,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
 }
-
 
 flutter {
     source = "../.."
