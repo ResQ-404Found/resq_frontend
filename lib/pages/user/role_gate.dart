@@ -45,6 +45,7 @@ class _RoleGateState extends State<RoleGate> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(child: CircularProgressIndicator()),
       ),

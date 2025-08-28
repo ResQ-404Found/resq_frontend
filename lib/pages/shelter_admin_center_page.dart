@@ -1,5 +1,11 @@
 // shelter_admin_center_page.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+/// 서버 베이스 URL (끝에 슬래시 X)
+const String _apiBase = 'http://54.253.211.96:8000';
 
 void main() => runApp(const _DemoApp());
 
@@ -13,109 +19,576 @@ class _DemoApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: const Color(0xFF2D6CF6),
-        fontFamily: 'Pretendard', // 없어도 동작
+        fontFamily: 'Pretendard',
       ),
       home: const ShelterAdminCenterPage(),
     );
   }
 }
 
-class ShelterAdminCenterPage extends StatelessWidget {
+/// =====================
+/// 데이터 모델/클라이언트
+/// =====================
+class AdminShelter {
+  final int id;
+  final String source;
+  final int hcode;
+  final String sigungu;
+  final String eupmyeon;
+  final String facilityName;
+  final String roadAddress;
+  final String shelterTypeName;
+  final int shelterTypeCode;
+  final int assignedPop;
+  final int capacityEst;
+  final num pElderly;
+  final num pChild;
+  final num vuln;
+  final num recommendScore;
+  final int priority;
+  final double latitude;
+  final double longitude;
+  final double distanceKm;
+  final String priorityGrade;
+  final String recommendGrade;
+
+  const AdminShelter({
+    required this.id,
+    required this.source,
+    required this.hcode,
+    required this.sigungu,
+    required this.eupmyeon,
+    required this.facilityName,
+    required this.roadAddress,
+    required this.shelterTypeName,
+    required this.shelterTypeCode,
+    required this.assignedPop,
+    required this.capacityEst,
+    required this.pElderly,
+    required this.pChild,
+    required this.vuln,
+    required this.recommendScore,
+    required this.priority,
+    required this.latitude,
+    required this.longitude,
+    required this.distanceKm,
+    required this.priorityGrade,
+    required this.recommendGrade,
+  });
+
+  factory AdminShelter.fromJson(Map<String, dynamic> j) {
+    double _d(dynamic v) =>
+        v == null ? 0 : (v is int ? v.toDouble() : (v as num).toDouble());
+    int _i(dynamic v) => v == null ? 0 : (v as num).toInt();
+    String _s(dynamic v) => v?.toString() ?? '';
+
+    return AdminShelter(
+      id: _i(j['id']),
+      source: _s(j['source']),
+      hcode: _i(j['HCODE']),
+      sigungu: _s(j['SIGUNGU']),
+      eupmyeon: _s(j['EUPMYEON']),
+      facilityName: _s(j['facility_name']),
+      roadAddress: _s(j['road_address']),
+      shelterTypeName: _s(j['shelter_type_name']),
+      shelterTypeCode: _i(j['shelter_type_code']),
+      assignedPop: _i(j['assigned_pop']),
+      capacityEst: _i(j['capacity_est']),
+      pElderly: j['p_elderly'] ?? 0,
+      pChild: j['p_child'] ?? 0,
+      vuln: j['vuln'] ?? 0,
+      recommendScore: (j['recommend_score'] ?? 0),
+      priority: _i(j['priority']),
+      latitude: _d(j['latitude']),
+      longitude: _d(j['longitude']),
+      distanceKm: _d(j['distance_km']),
+      priorityGrade: _s(j['priority_grade']),
+      recommendGrade: _s(j['recommend_grade']),
+    );
+  }
+}
+
+class ShelterApi {
+  /// 기본 목록: 서버가 내부 로직으로 정렬/거리 계산. 파라미터는 limit만.
+  static Future<List<AdminShelter>> fetchNearby({int limit = 20}) async {
+    final uri = Uri.parse('$_apiBase/shelters/csv/admin/nearby')
+        .replace(queryParameters: {'limit': '$limit'});
+
+    final res = await http.get(uri, headers: {'Accept': 'application/json'});
+    if (res.statusCode != 200) {
+      throw Exception('API ${res.statusCode}: ${res.body}');
+    }
+    return _parseList(res.body);
+  }
+
+  /// 검색: q 필수, sort_mode 기본 priority
+  static Future<List<AdminShelter>> search({
+    required String q,
+    int limit = 20,
+    String sortMode = 'priority',
+  }) async {
+    final uri = Uri.parse('$_apiBase/shelters/csv/admin/search').replace(
+      queryParameters: {
+        'q': q,
+        'limit': '$limit',
+        'sort_mode': sortMode,
+      },
+    );
+
+    final res = await http.get(uri, headers: {'Accept': 'application/json'});
+    if (res.statusCode != 200) {
+      throw Exception('API ${res.statusCode}: ${res.body}');
+    }
+    return _parseList(res.body);
+  }
+
+  /// 상세
+  static Future<AdminShelter> fetchDetail({required int shelterId}) async {
+    final uri = Uri.parse('$_apiBase/shelters/csv/admin/$shelterId');
+    final res = await http.get(uri, headers: {'Accept': 'application/json'});
+    if (res.statusCode != 200) {
+      throw Exception('API ${res.statusCode}: ${res.body}');
+    }
+    final data = jsonDecode(res.body);
+    if (data is Map && data['data'] is Map) {
+      return AdminShelter.fromJson(data['data'] as Map<String, dynamic>);
+    }
+    if (data is Map) {
+      return AdminShelter.fromJson(data as Map<String, dynamic>);
+    }
+    throw Exception('Unexpected detail response');
+  }
+
+  static List<AdminShelter> _parseList(String body) {
+    final data = jsonDecode(body);
+    if (data is Map && data['data'] is List) {
+      return (data['data'] as List)
+          .map((e) => AdminShelter.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    if (data is List) {
+      return data
+          .map((e) => AdminShelter.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return [];
+  }
+}
+
+/// =====================
+/// UI
+/// =====================
+class ShelterAdminCenterPage extends StatefulWidget {
   const ShelterAdminCenterPage({super.key});
+
+  @override
+  State<ShelterAdminCenterPage> createState() => _ShelterAdminCenterPageState();
+}
+
+class _ShelterAdminCenterPageState extends State<ShelterAdminCenterPage> {
+  int _limit = 20;
+  bool _loading = false;
+  String? _error;
+  List<AdminShelter> _items = [];
+  String _sortMode = 'priority';
+  // 검색
+  final _searchController = TextEditingController();
+  String _query = ''; // 현재 검색어
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNearby();
+  }
+  Future<void> _runSearch() async {
+    final q = _searchController.text.trim();
+    setState(() { _query = q; _loading = true; _error = null; });
+    try {
+      final items = q.isEmpty
+          ? await ShelterApi.fetchNearby(limit: _limit)
+          : await ShelterApi.search(q: q, limit: _limit, sortMode: _sortMode);
+      setState(() => _items = items);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+
+  Future<void> _loadNearby() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final items = await ShelterApi.fetchNearby(limit: _limit);
+      setState(() => _items = items);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+
+  void _changeLimit(int v) {
+    if (_limit == v) return;
+    setState(() => _limit = v);
+    // 현재 검색모드 유지하여 다시 호출
+    if (_query.isEmpty) {
+      _loadNearby();
+    } else {
+      _runSearch();
+    }
+  }
+
+  Future<void> _logout() async {
+    // 1) 토큰 삭제
+    const storage = FlutterSecureStorage();
+    await storage.delete(key: 'accessToken');
+    await storage.delete(key: 'refreshToken');
+
+    // (선택) 앱 내 전역 클라이언트/상태 초기화가 필요하다면 여기서 정리
+    // HttpClient.clearAuth();  // 예시
+
+    // 2) 로그인 화면으로 스택 싹 교체
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final now = TimeOfDay.now();
-    String clock =
+    final clock =
         "${now.hourOfPeriod.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} ${now.period == DayPeriod.am ? 'AM' : 'PM'}";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(88),
+        preferredSize: const Size.fromHeight(120),
         child: Container(
-          padding: const EdgeInsets.only(top: 26),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1F2A37),
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-          ),
+          height: 100,
+          padding: const EdgeInsets.only(top: 15), // ← 여기서 위쪽 여백 조정
+          color: const Color(0xFF1F2A37),
           child: SafeArea(
             bottom: false,
-            child: ListTile(
-              dense: true,
-              leading: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.shield_outlined, color: Colors.white),
-              ),
-              title: const Text(
-                '대피소 관리센터',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-              subtitle: const Text(
-                '실시간 모니터링 및 관리',
-                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
-              ),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child:// appBar 안 Row 부분만 교체
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Icon(Icons.refresh, color: Colors.white70),
-                  const SizedBox(height: 4),
-                  Text(clock,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 11)),
-                ],
+                  // 왼쪽: 새로고침 (고정 48x48)
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+                      icon: const Icon(Icons.refresh, color: Colors.white70),
+                      tooltip: '새로고침',
+                      onPressed: () {
+                        if (_query.isEmpty) {
+                          _loadNearby();
+                        } else {
+                          _runSearch();
+                        }
+                      },
+                    ),
+                  ),
+
+                  // 가운데: 제목
+                  const Text(
+                    '대피소 관리센터',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                    ),
+                  ),
+
+                  // 오른쪽: 로그아웃 (고정 48x48)
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout, color: Colors.white70),
+                      tooltip: '로그아웃',
+                    ),
+                  ),
+              ],
               ),
             ),
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          const _SearchBar(),
-          const SizedBox(height: 10),
-          const _FilterRow(),
-          const SizedBox(height: 8),
-          _ShelterCard(
-            accentColor: const Color(0xFF22C55E),
-            name: '서울시청 대피소',
-            statusBadge: _Badge.blue('운영중'),
-            extraBadges: const [
-              _Badge.violet('취약자지원'),
-            ],
-            address: '서울특별시 중구 세종대로 110',
-            managerLine: '담당자: 김관리 | 직원: 15명 (의료: 3명)',
-            capacityNow: 1200,
-            capacityMax: 5000,
-            capacityDelta: 150,
-            lastReport: '10분전',
-            rate: 0.24,
-            facilityChips: const ['의료시설', '급식시설', '화장실', '샤워시설'],
+
+
+      body: RefreshIndicator(
+        onRefresh: () => _query.isEmpty ? _loadNearby() : _runSearch(),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            // 검색바 (서버 검색 사용)
+            _SearchBar(
+              controller: _searchController,
+              onSubmitted: (_) => _runSearch(),
+              onTapSearch: _runSearch,
+              onTapClear: () {
+                _searchController.clear();
+                _query = '';
+                _loadNearby();
+              },
+            ),
+            const SizedBox(height: 10),
+
+            _LimitRow(
+              limit: _limit,
+              onChanged: _changeLimit,
+              showSort: _query.isNotEmpty,    // ← 검색했을 때만 정렬 드롭다운 표시
+              sortMode: _sortMode,
+              onSortChanged: (v) {
+                setState(() => _sortMode = v);
+                if (_query.isNotEmpty) _runSearch(); // 정렬 바꾸면 재검색
+              },
+            ),
+            const SizedBox(height: 8),
+
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 48),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 48),
+                child: _ErrorBox(message: _error!),
+              )
+            else if (_items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 48),
+                  child: _EmptyBox(text: '대피소가 없습니다.'),
+                )
+              else
+                ..._items.map(
+                      (s) => _ShelterCard.fromAdminShelter(
+                    s,
+                    onTapDetail: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ShelterDetailPage(shelterId: s.id),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 검색창 위젯
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onTapSearch;
+  final VoidCallback? onTapClear;
+
+  const _SearchBar({
+    required this.controller,
+    this.onSubmitted,
+    this.onTapSearch,
+    this.onTapClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: TextField(
+              controller: controller,
+              onSubmitted: onSubmitted,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: '대피소명으로 검색',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: controller.text.isEmpty
+                    ? null
+                    : IconButton(
+                  onPressed: onTapClear,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+                border: InputBorder.none,
+                contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              ),
+            ),
           ),
-          _ShelterCard(
-            accentColor: const Color(0xFF10B981),
-            name: '부산시민회관 대피소',
-            statusBadge: _Badge.orange('거의만석'),
-            extraBadges: const [
-              _Badge.violet('취약자지원'),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 44,
+          child: FilledButton.icon(
+            onPressed: onTapSearch,
+            icon: const Icon(Icons.search, size: 18),
+            label: const Text('검색'),
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+class _LimitRow extends StatelessWidget {
+  final int limit;
+  final ValueChanged<int> onChanged;
+  final bool showSort;
+  final String? sortMode;
+  final ValueChanged<String>? onSortChanged;
+
+  const _LimitRow({
+    required this.limit,
+    required this.onChanged,
+    this.showSort = false,
+    this.sortMode,
+    this.onSortChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // 개수 선택
+        Expanded(
+          child: _DropChip<int>(
+            text: '개수: $limit',
+            items: const [
+              DropdownMenuEntry(value: 10, label: '10'),
+              DropdownMenuEntry(value: 20, label: '20'),
+              DropdownMenuEntry(value: 30, label: '30'),
+              DropdownMenuEntry(value: 50, label: '50'),
+              DropdownMenuEntry(value: 100, label: '100'),
             ],
-            address: '부산광역시 중구 대청로 120',
-            managerLine: '담당자: 이담당 | 직원: 22명 (의료: 8명)',
-            capacityNow: 2850,
-            capacityMax: 3000,
-            capacityDelta: 50,
-            lastReport: '5분전',
-            rate: 0.95,
-            facilityChips: const ['휠체어접근', '의료진상주', '급식시설', '응급실'],
+            value: limit,
+            onSelected: (v) {
+              if (v != null) onChanged(v);
+            },
+          ),
+        ),
+
+        if (showSort) ...[
+          const SizedBox(width: 8),
+          // 정렬 선택 (검색 중일 때만 노출)
+          Expanded(
+            child: Container(
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: (sortMode ?? 'priority'),
+                  isExpanded: true,
+                  onChanged: (v) {
+                    if (v == null) return;
+                    onSortChanged?.call(v);
+                  },
+                  items: const [
+                    DropdownMenuItem(value: 'priority', child: Text('우선순위')),
+                    DropdownMenuItem(value: 'priority_grade', child: Text('등급')),
+                    DropdownMenuItem(value: 'accuracy', child: Text('정확도')),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+
+class _DropChip<T> extends StatelessWidget {
+  final String text;
+  final List<DropdownMenuEntry<T>> items;
+  final T value;
+  final ValueChanged<T?> onSelected;
+
+  const _DropChip({
+    required this.text,
+    required this.items,
+    required this.value,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: DropdownMenu<T>(
+        initialSelection: value,
+        dropdownMenuEntries: items,
+        onSelected: onSelected,
+        inputDecorationTheme: const InputDecorationTheme(
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+        trailingIcon: const Icon(Icons.keyboard_arrow_down),
+        label: Text(text, overflow: TextOverflow.ellipsis),
+      ),
+    );
+  }
+}
+
+
+class _ErrorBox extends StatelessWidget {
+  final String message;
+  const _ErrorBox({required this.message});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Color(0xFF991B1B)),
+            ),
           ),
         ],
       ),
@@ -123,117 +596,92 @@ class ShelterAdminCenterPage extends StatelessWidget {
   }
 }
 
-/// 검색창
-class _SearchBar extends StatelessWidget {
-  const _SearchBar();
-
+class _EmptyBox extends StatelessWidget {
+  final String text;
+  const _EmptyBox({required this.text});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: const TextField(
-        decoration: InputDecoration(
-          hintText: '대피소명 또는 주소로 검색',
-          prefixIcon: Icon(Icons.search),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        ),
-      ),
-    );
-  }
-}
-
-/// 필터 셀
-class _FilterRow extends StatelessWidget {
-  const _FilterRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: const [
-        _FilterChip(text: '전체'),
-        SizedBox(width: 8),
-        _FilterChip(text: '전체 상태'),
-        SizedBox(width: 8),
-        _FilterChip(text: '전체 유형'),
+    return Column(
+      children: [
+        const Icon(Icons.search_off, size: 48, color: Colors.black38),
+        const SizedBox(height: 8),
+        Text(text, style: const TextStyle(color: Color(0xFF000000))),
       ],
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String text;
-  const _FilterChip({required this.text});
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 38,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () {},
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(text, style: const TextStyle(fontSize: 13)),
-              const SizedBox(width: 6),
-              const Icon(Icons.keyboard_arrow_down, size: 18),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
+/// ===============
 /// 대피소 카드
+/// ===============
 class _ShelterCard extends StatelessWidget {
   final Color accentColor;
   final String name;
-  final _Badge statusBadge;
-  final List<_Badge> extraBadges;
+  final List<_Badge> extraBadges; // 우선등급/취약자
   final String address;
   final String managerLine;
-  final int capacityNow;
-  final int capacityMax;
-  final int capacityDelta;
-  final String lastReport;
-  final double rate; // 0.0 ~ 1.0
-  final List<String> facilityChips;
+  final String subtitleRight;
+  final VoidCallback onTapDetail;
 
   const _ShelterCard({
     required this.accentColor,
     required this.name,
-    required this.statusBadge,
     required this.extraBadges,
     required this.address,
     required this.managerLine,
-    required this.capacityNow,
-    required this.capacityMax,
-    required this.capacityDelta,
-    required this.lastReport,
-    required this.rate,
-    required this.facilityChips,
+    required this.subtitleRight,
+    required this.onTapDetail,
     super.key,
   });
 
+  /// API 모델 → 카드 빌더
+  static _ShelterCard fromAdminShelter(
+      AdminShelter s, {
+        required VoidCallback onTapDetail,
+      }) {
+    // 이름 기본값 처리
+    final shelterName =
+    (s.facilityName.isEmpty) ? '민방위 대피소' : s.facilityName;
+
+    // 취약자 텍스트 (임계값 0.3)
+    String vulnText = '일반';
+    if (s.pElderly >= 0.3 && s.pChild >= 0.3) {
+      vulnText = '노인·아동 다수';
+    } else if (s.pElderly >= 0.3) {
+      vulnText = '노인 다수';
+    } else if (s.pChild >= 0.3) {
+      vulnText = '아동 다수';
+    }
+
+    final badges = <_Badge>[
+      _Badge.blue('우선 ${s.priorityGrade} (#${s.priority})'),
+      _Badge.violet(vulnText),
+    ];
+
+    return _ShelterCard(
+      accentColor: _accentByType(s.shelterTypeCode),
+      name: shelterName,
+      extraBadges: badges,
+      address: s.roadAddress,
+      managerLine: '출처:${s.source} · 행정코드:${s.hcode} · ${s.sigungu}',
+      subtitleRight: s.shelterTypeName,
+      onTapDetail: onTapDetail,
+    );
+  }
+
+  static Color _accentByType(int code) {
+    switch (code) {
+      case 1:
+        return const Color(0xFF0EA5E9); // 한파
+      case 2:
+        return const Color(0xFFF59E0B); // 무더위
+      default:
+        return const Color(0xFF22C55E); // 민방위 등
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final dangerColor = rate >= .9
-        ? const Color(0xFFEF4444)
-        : rate >= .7
-        ? const Color(0xFFF59E0B)
-        : const Color(0xFF22C55E);
-
     return Container(
       margin: const EdgeInsets.only(top: 12),
       decoration: BoxDecoration(
@@ -270,7 +718,7 @@ class _ShelterCard extends StatelessWidget {
               children: [
                 // 제목 + 배지
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:  CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       child: Wrap(
@@ -284,9 +732,14 @@ class _ShelterCard extends StatelessWidget {
                                 fontSize: 18, fontWeight: FontWeight.w800),
                           ),
                           ...extraBadges,
-                          statusBadge,
                         ],
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      subtitleRight,
+                      style: const TextStyle(
+                          color: Color(0xFF9CA3AF), fontSize: 12),
                     ),
                   ],
                 ),
@@ -300,162 +753,34 @@ class _ShelterCard extends StatelessWidget {
                         color: Color(0xFF9CA3AF), fontSize: 12)),
                 const SizedBox(height: 12),
 
-                // 수용 현황 헤더
-                Row(
-                  children: [
-                    const Text('수용 현황',
+                // 버튼: 상세보기만
+                // 버튼: 링크 스타일(오른쪽 정렬, 배경/테두리/아이콘 없음)
+                Align(
+                  alignment: Alignment.centerRight, // 오른쪽 정렬
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                    child: TextButton(
+                      onPressed: onTapDetail,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF2563EB),
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        '상세 보기',
                         style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 14)),
-                    const Spacer(),
-                    Text(
-                      '${_comma(capacityNow)} / ${_comma(capacityMax)}명',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800, fontSize: 14),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '+$capacityDelta',
-                      style: const TextStyle(
-                          color: Color(0xFFEF4444),
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          fontSize: 12),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // 프로그레스 바
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    height: 10,
-                    child: Stack(
-                      children: [
-                        Container(color: const Color(0xFFF3F4F6)),
-                        FractionallySizedBox(
-                          widthFactor: rate.clamp(0, 1),
-                          child: Container(color: dangerColor),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-
-                // 수용률 / 최종보고
-                Row(
-                  children: [
-                    const Icon(Icons.show_chart,
-                        size: 16, color: Color(0xFF6B7280)),
-                    const SizedBox(width: 6),
-                    Text('수용률: ${(rate * 100).round()}%',
-                        style: const TextStyle(color: Color(0xFF4B5563))),
-                    const Spacer(),
-                    const Icon(Icons.access_time,
-                        size: 16, color: Color(0xFF6B7280)),
-                    const SizedBox(width: 6),
-                    Text('최종보고: $lastReport',
-                        style: const TextStyle(color: Color(0xFF4B5563))),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // 시설 태그
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                  facilityChips.map((t) => _TagChip(text: t)).toList(),
-                ),
-                const SizedBox(height: 14),
-
-                // 버튼들
-                Row(
-                  children: [
-                    _ghostButton(
-                      icon: Icons.visibility_outlined,
-                      label: '상세보기',
-                      onTap: () {},
-                    ),
-                    const SizedBox(width: 8),
-                    _fillButton(
-                      icon: Icons.admin_panel_settings_outlined,
-                      label: '관리',
-                      onTap: () {},
-                    ),
-                    const SizedBox(width: 8),
-                    _ghostButton(
-                      icon: Icons.settings_outlined,
-                      label: '설정',
-                      onTap: () {},
-                    ),
-                  ],
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _fillButton(
-      {required IconData icon,
-        required String label,
-        required VoidCallback onTap}) {
-    return Expanded(
-      child: SizedBox(
-        height: 42,
-        child: FilledButton.icon(
-          onPressed: onTap,
-          icon: Icon(icon, size: 18),
-          label: Text(label),
-          style: FilledButton.styleFrom(
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _ghostButton(
-      {required IconData icon,
-        required String label,
-        required VoidCallback onTap}) {
-    return Expanded(
-      child: SizedBox(
-        height: 42,
-        child: OutlinedButton.icon(
-          onPressed: onTap,
-          icon: Icon(icon, size: 18),
-          label: Text(label),
-          style: OutlinedButton.styleFrom(
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TagChip extends StatelessWidget {
-  final String text;
-  const _TagChip({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-            fontSize: 12, color: Color(0xFF4B5563), fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -468,18 +793,15 @@ class _Badge extends StatelessWidget {
 
   const _Badge(this.text, this.bg, this.fg, {super.key});
 
-  const _Badge.violet(this.text,
-      {super.key})
+  const _Badge.violet(this.text, {super.key})
       : bg = const Color(0xFFF1E8FF),
         fg = const Color(0xFF7C3AED);
 
-  const _Badge.blue(this.text,
-      {super.key})
+  const _Badge.blue(this.text, {super.key})
       : bg = const Color(0xFFE8F1FF),
         fg = const Color(0xFF2563EB);
 
-  const _Badge.orange(this.text,
-      {super.key})
+  const _Badge.orange(this.text, {super.key})
       : bg = const Color(0xFFFFF3E6),
         fg = const Color(0xFFF59E0B);
 
@@ -487,11 +809,9 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration:
-      BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
       child: Text(text,
-          style: TextStyle(
-              color: fg, fontSize: 11, fontWeight: FontWeight.w800)),
+          style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w800)),
     );
   }
 }
@@ -500,4 +820,151 @@ String _comma(num n) {
   final s = n.toString();
   final reg = RegExp(r'\B(?=(\d{3})+(?!\d))');
   return s.replaceAllMapped(reg, (m) => ',');
+}
+
+/// =====================
+/// 상세 페이지
+/// =====================
+class ShelterDetailPage extends StatefulWidget {
+  final int shelterId;
+  const ShelterDetailPage({super.key, required this.shelterId});
+
+  @override
+  State<ShelterDetailPage> createState() => _ShelterDetailPageState();
+}
+
+class _ShelterDetailPageState extends State<ShelterDetailPage> {
+  AdminShelter? _detail;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final d = await ShelterApi.fetchDetail(shelterId: widget.shelterId);
+      setState(() => _detail = d);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1F2A37),
+        title: const Text('대피소 상세', style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left, size: 30, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            onPressed: _load,
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+            tooltip: '새로고침',
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? _ErrorBox(message: _error!)
+          : _detail == null
+          ? const _EmptyBox(text: '상세 데이터를 불러올 수 없습니다.')
+          : ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _detailHeader(_detail!),
+          const SizedBox(height: 12),
+          _kv('시설명', _detail!.facilityName.isEmpty ? '민방위 대피소' : _detail!.facilityName),
+          _kv('주소', _detail!.roadAddress),
+          _kv('유형', _detail!.shelterTypeName),
+          _kv('시군구', _detail!.sigungu),
+          _kv('행정코드(HCODE)', '${_detail!.hcode}'),
+          const Divider(height: 24),
+          _kv('우선등급', '${_detail!.priorityGrade} (#${_detail!.priority})'),
+          _kv('예상 노인 비율', '${(_detail!.pElderly * 100).toStringAsFixed(1)}%'),
+          _kv('예상 아동 비율', '${(_detail!.pChild * 100).toStringAsFixed(1)}%'),
+          _kv('대피소 종류', _detail!.source),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailHeader(AdminShelter s) {
+    // 취약자 텍스트
+    String vulnText = '일반';
+    if (s.pElderly >= 0.3 && s.pChild >= 0.3) {
+      vulnText = '노인·아동 다수';
+    } else if (s.pElderly >= 0.3) {
+      vulnText = '노인 다수';
+    } else if (s.pChild >= 0.3) {
+      vulnText = '아동 다수';
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            s.facilityName.isEmpty ? '민방위 대피소' : s.facilityName,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _Badge.blue('우선 ${s.priorityGrade} (#${s.priority})'),
+              _Badge.violet(vulnText),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(k,
+                style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13)),
+          ),
+          Expanded(
+            child: Text(v,
+                style: const TextStyle(
+                    color: Color(0xFF111827),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14)),
+          ),
+        ],
+      ),
+    );
+  }
 }
