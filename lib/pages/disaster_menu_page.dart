@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:resq_frontend/pages/quiz.dart';
 
 import 'disaster_guide_page.dart';
-import 'checklist.dart';
-import 'all_disaster_type_detail_page.dart';
 import 'app_bottom_nav.dart';
 import 'friend_page.dart';
 import 'donation_list_page.dart';
@@ -143,13 +141,11 @@ class DisasterMenuPage extends StatelessWidget {
                         ),
                       );
                     } else if (title == '퀴즈') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const QuizPage(),
-                        ),
-                      );
-                    }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const QuizListPage()),
+                        );
+                      }
                   },
                   child: Container(
                     height: 95,

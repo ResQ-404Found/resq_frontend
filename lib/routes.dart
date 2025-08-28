@@ -28,6 +28,8 @@ import 'pages/news_page.dart';
 import 'pages/my_post_detail_page.dart';
 import 'pages/all_disaster_type_detail_page.dart';
 import 'pages/disaster_detail_page.dart';
+import 'pages/quiz.dart';
+import 'pages/quiz_details.dart';
 
 
 /// Central place for route names
@@ -64,6 +66,8 @@ class AppRoutes {
   static const allDisasters = '/all-disasters';
   static const disasterDetail = '/disasterDetail';
 
+  static const quiz = '/quiz';
+  static const quizDetail = '/quiz/detail';
 
   // password reset
   static const pwReq = '/password_reset_request';
@@ -111,6 +115,20 @@ class AppRouter {
 
       case AppRoutes.withdrawl:
         return _page(WithdrawalConfirmationPage());
+
+      case AppRoutes.quiz:
+        return _page(const QuizListPage());
+
+      case AppRoutes.quizDetail: {
+        final map = (args is Map<String, dynamic>) ? args : const <String, dynamic>{};
+        return _page(QuizDetailsPage(
+          title:       (map['title'] as String?) ?? '퀴즈',
+          timeMinutes: (map['timeMinutes'] as int?) ?? 5,
+          category:    (map['category'] as String?) ?? '지진',
+          topic:       (map['topic'] as String?) ?? '지진 발생 시 행동요령',
+          nQuestions:  (map['nQuestions'] as int?) ?? 5,
+        ));
+      }
 
       case AppRoutes.disastermenu:
         return _page(DisasterMenuPage());

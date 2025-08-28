@@ -33,11 +33,17 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
   Future<void> _loadChatHistory() async {
     setState(() => _loadingHistory = true);
     final token = await _storage.read(key: 'accessToken');
+
     if (token == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인이 필요합니다')),
+          const SnackBar(content: Text('로그인이 필요합니다. 다시 로그인해주세요.')),
         );
+      }
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        // '/login'을 실제 로그인 페이지 경로로 변경해주세요.
+        Navigator.pushReplacementNamed(context, '/login');
       }
       if (mounted) setState(() => _loadingHistory = false);
       return;
@@ -64,6 +70,17 @@ class _ChatbotPageState extends State<ChatbotPage> with SingleTickerProviderStat
           }
         });
         _jumpToBottom();
+      } else if (response.statusCode == 401) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('세션이 만료되었습니다. 다시 로그인해주세요.')),
+          );
+        }
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          // '/login'을 실제 로그인 페이지 경로로 변경해주세요.
+          Navigator.pushReplacementNamed(context, '/login');
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
