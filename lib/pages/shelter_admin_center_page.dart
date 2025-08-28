@@ -475,98 +475,179 @@ class _LimitRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        // 개수 선택
-        Expanded(
-          child: _DropChip<int>(
-            text: '개수: $limit',
-            items: const [
-              DropdownMenuEntry(value: 10, label: '10'),
-              DropdownMenuEntry(value: 20, label: '20'),
-              DropdownMenuEntry(value: 30, label: '30'),
-              DropdownMenuEntry(value: 50, label: '50'),
-              DropdownMenuEntry(value: 100, label: '100'),
-            ],
-            value: limit,
-            onSelected: (v) {
-              if (v != null) onChanged(v);
-            },
-          ),
-        ),
-
-        if (showSort) ...[
-          const SizedBox(width: 8),
-          // 정렬 선택 (검색 중일 때만 노출)
-          Expanded(
-            child: Container(
-              height: 38,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: (sortMode ?? 'priority'),
-                  isExpanded: true,
-                  onChanged: (v) {
-                    if (v == null) return;
-                    onSortChanged?.call(v);
-                  },
-                  items: const [
-                    DropdownMenuItem(value: 'priority', child: Text('우선순위')),
-                    DropdownMenuItem(value: 'priority_grade', child: Text('등급')),
-                    DropdownMenuItem(value: 'accuracy', child: Text('정확도')),
-                  ],
-                ),
+    return LayoutBuilder(
+      builder: (context, c) {
+        // 검색 안 했을 때는 왼쪽에서 가용폭의 절반만 차지
+        if (!showSort) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: c.maxWidth * 0.5,
+              child: _DropChip<int>(
+                text: '개수: $limit',
+                value: limit,
+                items: const [
+                  DropdownMenuItem(value: 10, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('10'))),
+                  DropdownMenuItem(value: 20, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('20'))),
+                  DropdownMenuItem(value: 30, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('30'))),
+                  DropdownMenuItem(value: 50, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('50'))),
+                  DropdownMenuItem(value: 100, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('100'))),
+                ],
+                onChanged: (v) {
+                  if (v != null) onChanged(v);
+                },
               ),
             ),
-          ),
-        ],
-      ],
+          );
+        }
+
+        // 검색했을 때는 둘 다 반반
+        return Row(
+          children: [
+            Expanded(
+              child: _DropChip<int>(
+                text: '개수: $limit',
+                value: limit,
+                items: const [
+                  DropdownMenuItem(value: 10, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('10'))),
+                  DropdownMenuItem(value: 20, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('20'))),
+                  DropdownMenuItem(value: 30, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('30'))),
+                  DropdownMenuItem(value: 50, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('50'))),
+                  DropdownMenuItem(value: 100, child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('100'))),
+                ],
+                onChanged: (v) {
+                  if (v != null) onChanged(v);
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _SortChip(
+                value: (sortMode ?? 'priority'),
+                onChanged: (v) {
+                  if (v == null) return;
+                  onSortChanged?.call(v);
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 
 class _DropChip<T> extends StatelessWidget {
-  final String text;
-  final List<DropdownMenuEntry<T>> items;
+  final String text; // "개수: 20"
+  final List<DropdownMenuItem<T>> items;
   final T value;
-  final ValueChanged<T?> onSelected;
+  final ValueChanged<T?> onChanged;
 
   const _DropChip({
     required this.text,
     required this.items,
     required this.value,
-    required this.onSelected,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 38,
+      height: 48, // 정렬 드롭다운과 높이 통일
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: DropdownMenu<T>(
-        initialSelection: value,
-        dropdownMenuEntries: items,
-        onSelected: onSelected,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 0),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          icon: const Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Icon(Icons.keyboard_arrow_down),
+          ),
+          onChanged: onChanged,
+          items: items,
+          dropdownColor: Colors.white,                 // 팝업 배경 흰색
+          borderRadius: BorderRadius.circular(12),     // 팝업 라운딩
+          menuMaxHeight: 300,
+          // 닫힌 상태에서 ‘개수: N’만 보이도록 items.length만큼 동일 위젯 반환
+          selectedItemBuilder: (context) => List.generate(
+            items.length,
+                (_) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  text,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+          ),
         ),
-        trailingIcon: const Icon(Icons.keyboard_arrow_down),
-        label: Text(text, overflow: TextOverflow.ellipsis),
       ),
     );
   }
 }
 
+
+class _SortChip extends StatelessWidget {
+  final String value;
+  final ValueChanged<String?> onChanged;
+
+  const _SortChip({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down),
+          onChanged: onChanged,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          menuMaxHeight: 300,
+          items: const [
+            DropdownMenuItem(value: 'priority',       child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Text('우선순위', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            )),
+            DropdownMenuItem(value: 'priority_grade', child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Text('등급',     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            )),
+            DropdownMenuItem(value: 'accuracy',       child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Text('정확도',   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            )),
+          ],
+          // 버튼에 보이는 모양도 패딩/정렬 통일
+          selectedItemBuilder: (context) => const [
+            Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Align(alignment: Alignment.centerLeft, child: Text('우선순위',   overflow: TextOverflow.ellipsis))),
+            Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Align(alignment: Alignment.centerLeft, child: Text('등급',     overflow: TextOverflow.ellipsis))),
+            Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Align(alignment: Alignment.centerLeft, child: Text('정확도',   overflow: TextOverflow.ellipsis))),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ErrorBox extends StatelessWidget {
   final String message;
