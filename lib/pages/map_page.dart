@@ -19,6 +19,13 @@ class Shelter {
   final double latitude;
   final double longitude;
   final double distance;
+  // 새로 추가된 필드
+  final String source;
+  final int recommendScore;
+  final String recommendGrade;
+  final int capacityEst;
+  final int pElderly;
+  final int pChild;
 
   Shelter({
     required this.name,
@@ -26,15 +33,29 @@ class Shelter {
     required this.latitude,
     required this.longitude,
     required this.distance,
+    required this.source,
+    required this.recommendScore,
+    required this.recommendGrade,
+    required this.capacityEst,
+    required this.pElderly,
+    required this.pChild,
   });
+
 
   factory Shelter.fromJson(Map<String, dynamic> json) {
     return Shelter(
       name: json['facility_name'],
       address: json['road_address'],
-      latitude: json['latitude'],
-      longitude: json['longitude'],
-      distance: json['distance_km'],
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
+      distance: (json['distance_km'] as num).toDouble(),
+
+      source: json['source'] ?? '',
+      recommendScore: json['recommend_score'] ?? 0,
+      recommendGrade: json['recommend_grade'] ?? '',
+      capacityEst: json['capacity_est'] ?? 0,
+      pElderly: json['p_elderly'] ?? 0,
+      pChild: json['p_child'] ?? 0,
     );
   }
 }
@@ -297,7 +318,7 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
     setState(() => _loadingShelters = true);
     try {
       final url = Uri.parse(
-          'http://54.253.211.96:8000/api/shelters/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10');
+          'http://54.253.211.96:8000/api/shelters/csv/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10');
       final response = await http.get(url, headers: {'accept': 'application/json'});
 
       if (response.statusCode == 200) {
@@ -778,6 +799,11 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
           _infoRow('이름', shelter.name),
           _infoRow('주소', shelter.address),
           _infoRow('거리', '${(shelter.distance * 1000).toStringAsFixed(0)}m'),
+          _infoRow('추천 점수', '${shelter.recommendScore} (${shelter.recommendGrade})'),
+          _infoRow('수용 가능 인원', '${shelter.capacityEst}명'),
+          _infoRow('노약자 비율', '${shelter.pElderly}%'),
+          _infoRow('아동 비율', '${shelter.pChild}%'),
+
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () async {
