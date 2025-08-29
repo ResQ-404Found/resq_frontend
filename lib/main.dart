@@ -43,7 +43,7 @@ Future<void> updateEmergencyWidget() async {
   await HomeWidget.updateWidget(
     name: 'EmergencyWidgetProvider', // AndroidManifest에 등록한 Provider 이름
     iOSName: 'EmergencyWidget',      // iOS는 안 쓴다면 무시됨
-    qualifiedAndroidName: 'send_emergency', // 버튼 눌렀을 때 Uri.host로 전달됨
+    // qualifiedAndroidName: 'send_emergency', // 버튼 눌렀을 때 Uri.host로 전달됨
   );
 }
 
