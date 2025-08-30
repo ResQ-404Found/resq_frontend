@@ -21,11 +21,8 @@ class Shelter {
   final double distance;
 
   final String source;
-  final double recommendScore;
   final String recommendGrade;
   final double capacityEst;
-  final double pElderly;
-  final double pChild;
 
   Shelter({
     required this.name,
@@ -34,11 +31,8 @@ class Shelter {
     required this.longitude,
     required this.distance,
     required this.source,
-    required this.recommendScore,
     required this.recommendGrade,
     required this.capacityEst,
-    required this.pElderly,
-    required this.pChild,
   });
 
   factory Shelter.fromJson(Map<String, dynamic> json) {
@@ -50,11 +44,8 @@ class Shelter {
       distance: (json['distance_km'] as num).toDouble(),
 
       source: json['source'] ?? '',
-      recommendScore: (json['recommend_score'] as num?)?.toDouble() ?? 0.0,
       recommendGrade: json['recommend_grade'] ?? '',
       capacityEst: (json['capacity_est'] as num?)?.toDouble() ?? 0.0,
-      pElderly: (json['p_elderly'] as num?)?.toDouble() ?? 0.0,
-      pChild: (json['p_child'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
@@ -842,19 +833,13 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
 
           // 추천 점수 + 등급
           _infoRow(
-            '추천 점수',
-            '${shelter.recommendScore.toStringAsFixed(2)} (${shelter.recommendGrade})',
-          ),
-          _infoRow(
             '추천 등급',
             shelter.recommendGrade.isNotEmpty ? shelter.recommendGrade : 'N/A',
           ),
 
           // 수용/비율
           _infoRow('예상 수용 가능 인원', '${shelter.capacityEst.toStringAsFixed(0)}명'),
-          _infoRow('예상 노약자 비율', '${(shelter.pElderly * 100).toStringAsFixed(1)}%'),
-          _infoRow('예상 아동 비율', '${(shelter.pChild * 100).toStringAsFixed(1)}%'),
-
+        
           const SizedBox(height: 16),
 
           // 길찾기 안내 버튼
@@ -1048,4 +1033,3 @@ Color _getGradeColor(String grade) {
       return Colors.grey;
   }
 }
-
