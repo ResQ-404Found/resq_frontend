@@ -38,6 +38,9 @@ import 'pages/quiz.dart';
 import 'pages/quiz_details.dart';
 import 'pages/disaster_list_page.dart';
 import 'pages/disaster_detail_page.dart';
+import 'pages/disaster_prediction_admin.dart';
+import 'pages/shelter_admin_center_page.dart';
+
 /// Central place for route names
 class AppRoutes {
   static const root = '/';
@@ -84,6 +87,9 @@ class AppRoutes {
   static const pwVerify = '/password_reset_verify';
   static const pwNew = '/password_reset_new';
   static const roleGate = '/role-gate';
+
+  static const shelterAdminCenter = '/shelter-admin-center';
+  static const disasterPrediction = '/disaster-prediction';
 }
 
 /// Safer router: handles args & unknown routes
@@ -236,6 +242,12 @@ class AppRouter {
           ),
         );
       }
+
+      case AppRoutes.shelterAdminCenter:
+        return _page(const ShelterAdminCenterPage());
+
+      case AppRoutes.disasterPrediction:
+        return _page(const DisasterPredictionPage());
 
 
       default:
