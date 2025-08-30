@@ -8,13 +8,13 @@ import 'all_disaster_type_detail_page.dart';
 class DisasterListPage extends StatefulWidget {
   final String sido;
   final String sigungu;
-  final String eupmyeondong;
+  //final String eupmyeondong;
 
   const DisasterListPage({
     super.key,
     required this.sido,
     required this.sigungu,
-    required this.eupmyeondong,
+    //required this.eupmyeondong,
   });
 
 
@@ -23,7 +23,7 @@ class DisasterListPage extends StatefulWidget {
     return DisasterListPage(
       sido: (args?['sido'] as String?) ?? '',
       sigungu: (args?['sigungu'] as String?) ?? '',
-      eupmyeondong: (args?['eupmyeondong'] as String?) ?? '',
+      //eupmyeondong: (args?['eupmyeondong'] as String?) ?? '',
     );
   }
 
@@ -49,7 +49,7 @@ class _DisasterListPageState extends State<DisasterListPage> {
       final qp = <String, String>{
         if (widget.sido.isNotEmpty) 'sido': widget.sido,
         if (widget.sigungu.isNotEmpty) 'sigungu': widget.sigungu,
-        if (widget.eupmyeondong.isNotEmpty) 'eupmyeondong': widget.eupmyeondong,
+        //if (widget.eupmyeondong.isNotEmpty) 'eupmyeondong': widget.eupmyeondong,
         'active_only': 'true',
       };
 
@@ -102,7 +102,7 @@ class _DisasterListPageState extends State<DisasterListPage> {
   @override
   Widget build(BuildContext context) {
     final regionLabel =
-    '${widget.sido} ${widget.sigungu} ${widget.eupmyeondong}'.trim();
+    '${widget.sido} ${widget.sigungu}'.trim();
 
     return Scaffold(
       backgroundColor: Colors.white,

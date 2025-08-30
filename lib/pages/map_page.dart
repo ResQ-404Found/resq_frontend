@@ -19,13 +19,13 @@ class Shelter {
   final double latitude;
   final double longitude;
   final double distance;
-  // 새로 추가된 필드
+
   final String source;
-  final int recommendScore;
+  final double recommendScore;
   final String recommendGrade;
-  final int capacityEst;
-  final int pElderly;
-  final int pChild;
+  final double capacityEst;
+  final double pElderly;
+  final double pChild;
 
   Shelter({
     required this.name,
@@ -41,21 +41,20 @@ class Shelter {
     required this.pChild,
   });
 
-
   factory Shelter.fromJson(Map<String, dynamic> json) {
     return Shelter(
-      name: json['facility_name'],
-      address: json['road_address'],
+      name: json['facility_name'] ?? '',
+      address: json['road_address'] ?? '',
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
       distance: (json['distance_km'] as num).toDouble(),
 
       source: json['source'] ?? '',
-      recommendScore: json['recommend_score'] ?? 0,
+      recommendScore: (json['recommend_score'] as num?)?.toDouble() ?? 0.0,
       recommendGrade: json['recommend_grade'] ?? '',
-      capacityEst: json['capacity_est'] ?? 0,
-      pElderly: json['p_elderly'] ?? 0,
-      pChild: json['p_child'] ?? 0,
+      capacityEst: (json['capacity_est'] as num?)?.toDouble() ?? 0.0,
+      pElderly: (json['p_elderly'] as num?)?.toDouble() ?? 0.0,
+      pChild: (json['p_child'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
@@ -318,12 +317,18 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
     setState(() => _loadingShelters = true);
     try {
       final url = Uri.parse(
-          'http://54.253.211.96:8000/api/shelters/csv/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10');
+          'http://54.253.211.96:8000/shelters/csv/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10'
+      );
       final response = await http.get(url, headers: {'accept': 'application/json'});
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(utf8.decode(response.bodyBytes));
         final List<dynamic> data = jsonBody is List ? jsonBody : jsonBody['data'];
+
+        print('Loaded ${data.length} shelters');
+        for (var item in data) {
+          print(item);
+        }
 
         _shelterMarkers.clear();
         for (var item in data) {
@@ -332,7 +337,22 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
             id: 'shelter_${shelter.latitude}_${shelter.longitude}',
             position: NLatLng(shelter.latitude, shelter.longitude),
             icon: NOverlayImage.fromAssetImage('lib/asset/shelter_marker.png'),
-            caption: NOverlayCaption(text: shelter.name),
+
+            // 추천 등급 → shown on top
+            caption: NOverlayCaption(
+              text: shelter.recommendGrade.isNotEmpty ? shelter.recommendGrade : 'N/A',
+              color: _getGradeColor(shelter.recommendGrade),
+              textSize: 16,
+              haloColor: Colors.white,
+            ),
+
+            // 대피소 이름 → shown at bottom
+            subCaption: NOverlayCaption(
+              text: shelter.name,
+              color: Colors.black,
+              textSize: 12,
+              haloColor: Colors.white,
+            ),
           );
           marker.setOnTapListener((m) {
             if (!mounted) return;
@@ -368,25 +388,37 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
     try {
       final url = Uri.parse(
           'http://54.253.211.96:8000/api/hospital/nearby?latitude=${position.latitude}&longitude=${position.longitude}&limit=10');
-      final response = await http.get(url, headers: {'accept': 'application/json'});
+      final response =
+      await http.get(url, headers: {'accept': 'application/json'});
 
       if (response.statusCode == 200) {
         final jsonBody = json.decode(utf8.decode(response.bodyBytes));
-        final List<dynamic> data = jsonBody is List ? jsonBody : jsonBody['data'];
+        final List<dynamic> data =
+        jsonBody is List ? jsonBody : jsonBody['data'];
 
         _hospitalMarkers.clear();
         for (var item in data) {
           final hospital = Hospital.fromJson(item);
+
           final marker = NMarker(
             id: 'hospital_${hospital.latitude}_${hospital.longitude}',
             position: NLatLng(hospital.latitude, hospital.longitude),
             icon: NOverlayImage.fromAssetImage('lib/asset/hospital_marker.png'),
-            caption: NOverlayCaption(text: hospital.name),
+
+            // Only hospital name shown (bottom)
+            subCaption: NOverlayCaption(
+              text: hospital.name,
+              color: Colors.black,
+              textSize: 12,
+              haloColor: Colors.white,
+            ),
           );
+
           marker.setOnTapListener((m) {
             if (!mounted) return;
             setState(() {
-              _selectedHospital = (_selectedHospital?.name == hospital.name) ? null : hospital;
+              _selectedHospital =
+              (_selectedHospital?.name == hospital.name) ? null : hospital;
             });
           });
           _hospitalMarkers.add(marker);
@@ -409,6 +441,7 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
       if (mounted) setState(() => _loadingHospitals = false);
     }
   }
+
 
   Future<void> _fetchDisasters() async {
     if (_sido == null || _sigungu == null || _eupmyeondong == null) return;
@@ -790,33 +823,55 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('대피소 상세 정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            '대피소 상세 정보',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 12),
+
+          // 내 위치
           if (_currentAddress != null) ...[
             _infoRow('내 위치', _currentAddress!),
             const SizedBox(height: 6),
           ],
+
+          // 기본 정보
           _infoRow('이름', shelter.name),
           _infoRow('주소', shelter.address),
           _infoRow('거리', '${(shelter.distance * 1000).toStringAsFixed(0)}m'),
-          _infoRow('추천 점수', '${shelter.recommendScore} (${shelter.recommendGrade})'),
-          _infoRow('수용 가능 인원', '${shelter.capacityEst}명'),
-          _infoRow('노약자 비율', '${shelter.pElderly}%'),
-          _infoRow('아동 비율', '${shelter.pChild}%'),
+
+          // 추천 점수 + 등급
+          _infoRow(
+            '추천 점수',
+            '${shelter.recommendScore.toStringAsFixed(2)} (${shelter.recommendGrade})',
+          ),
+          _infoRow(
+            '추천 등급',
+            shelter.recommendGrade.isNotEmpty ? shelter.recommendGrade : 'N/A',
+          ),
+
+          // 수용/비율
+          _infoRow('예상 수용 가능 인원', '${shelter.capacityEst.toStringAsFixed(0)}명'),
+          _infoRow('예상 노약자 비율', '${(shelter.pElderly * 100).toStringAsFixed(1)}%'),
+          _infoRow('예상 아동 비율', '${(shelter.pChild * 100).toStringAsFixed(1)}%'),
 
           const SizedBox(height: 16),
+
+          // 길찾기 안내 버튼
           ElevatedButton(
             onPressed: () async {
               final lat = shelter.latitude;
               final lng = shelter.longitude;
               final name = Uri.encodeComponent(shelter.name);
-              final url = 'nmap://route/public?dlat=$lat&dlng=$lng&dname=$name&appname=com.pan.resq';
+              final url =
+                  'nmap://route/public?dlat=$lat&dlng=$lng&dname=$name&appname=com.pan.resq';
               if (await canLaunchUrl(Uri.parse(url))) {
                 await launchUrl(Uri.parse(url));
               } else {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(content: Text('네이버지도 앱이 설치되어 있지 않습니다.')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('네이버지도 앱이 설치되어 있지 않습니다.')),
+                );
               }
             },
             style: ElevatedButton.styleFrom(
@@ -824,7 +879,8 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
               padding: const EdgeInsets.symmetric(vertical: 14),
               minimumSize: const Size(double.infinity, 48),
             ),
-            child: const Text('길찾기 안내', style: TextStyle(color: Colors.white)),
+            child: const Text('길찾기 안내',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -974,3 +1030,22 @@ class _MapPageState extends State<MapPage> with AutomaticKeepAliveClientMixin {
     );
   }
 }
+
+Color _getGradeColor(String grade) {
+  switch (grade.toUpperCase()) {
+    case 'A':
+      return Colors.green;
+    case 'B':
+      return Colors.lightGreen;
+    case 'C':
+      return Colors.orange;
+    case 'D':
+      return Colors.deepOrange;
+    case 'E':
+    case 'F':
+      return Colors.redAccent;
+    default:
+      return Colors.grey;
+  }
+}
+
