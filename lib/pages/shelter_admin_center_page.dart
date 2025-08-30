@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:resq_frontend/routes.dart';
 
 /// 서버 베이스 URL (끝에 슬래시 X)
 const String _apiBase = 'http://54.253.211.96:8000';
@@ -391,6 +392,29 @@ class _ShelterAdminCenterPageState extends State<ShelterAdminCenterPage> {
           ],
         ),
       ),
+      bottomNavigationBar: BottomAppBar(
+        color: Colors.white,
+        elevation: 4,
+        shape: const CircularNotchedRectangle(),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.night_shelter, color: Color(0xFF2563EB)),
+              onPressed: () {
+                // 홈 버튼 액션
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.dangerous, color: Color(0xFF2563EB)),
+              onPressed: () {
+                Navigator.pushNamed(context, AppRoutes.disasterPrediction);
+              },
+            ),
+          ],
+        ),
+      ),
+
     );
   }
 }
